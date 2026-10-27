@@ -1,0 +1,698 @@
+<title>שלשלת 2026</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Karantina:wght@400;700&family=Assistant:wght@400;600;800&display=swap">
+<style>
+/* Layout: one-screen arcade cabinet. Portrait canvas centered, control deck below, HTML overlays for start/results. */
+:root {
+  --night: #13202a;      /* cabinet + sky */
+  --deck: #1c2d38;       /* control deck */
+  --mustard: #f2c230;    /* accent: headlines, primary button */
+  --poop: #7a4a1f;       /* the ammunition */
+  --poop-hi: #a8692f;
+  --paper: #f4ecd8;      /* text on dark */
+  --muted: #9fb3bf;
+  --bad: #e2574c;
+  --display: "Karantina", "Arial Narrow", "Assistant", sans-serif;
+  --body: "Assistant", "Arial Hebrew", "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--night); color: var(--paper);
+  font-family: var(--body); font-size: 16px;
+  overflow: hidden; touch-action: manipulation;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#app {
+  height: 100%; display: flex; flex-direction: column;
+  padding-left: max(0px, env(safe-area-inset-left, 0px));
+  padding-right: max(0px, env(safe-area-inset-right, 0px));
+}
+#stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
+canvas#game { display: block; touch-action: none; border-radius: 6px; }
+#deck {
+  display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 10px; direction: ltr;
+  padding-block: 10px 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--deck); border-top: 2px solid #000;
+  max-width: 520px; width: 100%; margin: 0 auto; box-sizing: border-box;
+}
+.pad {
+  font-family: var(--display); font-size: 30px; line-height: 1;
+  border: 0; border-radius: 14px; padding: 12px 0; color: var(--paper);
+  background: #2c4352; box-shadow: 0 4px 0 #0b141a; cursor: pointer;
+}
+.pad:active, .pad.held { transform: translateY(3px); box-shadow: 0 1px 0 #0b141a; }
+.pad.drop { background: var(--poop); box-shadow: 0 4px 0 #3b220c; font-size: 32px; }
+.pad:focus-visible, .btn:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+
+.overlay {
+  position: absolute; inset: 0; display: flex;
+  background: rgba(10, 18, 24, .82); overflow-y: auto;
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.card {
+  width: 100%; max-width: 440px; text-align: center; margin: auto;
+  display: flex; flex-direction: column; gap: 12px; align-items: center;
+}
+.logo {
+  font-family: var(--display); font-weight: 700; font-size: clamp(64px, 18vw, 96px);
+  line-height: .85; color: var(--mustard); margin: 0;
+  text-shadow: 4px 4px 0 var(--poop), 8px 8px 0 #000; letter-spacing: 1px;
+}
+.logo small { display: block; font-size: .42em; color: var(--paper); text-shadow: 2px 2px 0 #000; letter-spacing: 3px; }
+.lede { margin: 0; font-size: 17px; line-height: 1.45; max-width: 36ch; text-wrap: balance; }
+.rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 15px; text-align: right; }
+.rules li { display: flex; gap: 10px; align-items: baseline; }
+.rules b { font-family: var(--display); font-size: 22px; color: var(--mustard); min-width: 3.2ch; text-align: center; direction: ltr; font-variant-numeric: tabular-nums; }
+.btn {
+  font-family: var(--display); font-size: 34px; line-height: 1; cursor: pointer;
+  border: 0; border-radius: 999px; padding: 10px 34px 12px;
+  background: var(--mustard); color: #2a1a08; box-shadow: 0 5px 0 #8a6a0c;
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #8a6a0c; }
+.btn.ghost { background: transparent; color: var(--paper); box-shadow: inset 0 0 0 2px var(--muted); font-size: 24px; padding: 8px 22px 10px; }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+/* results */
+.verdict { font-family: var(--display); font-size: 40px; line-height: 1; color: var(--mustard); margin: 0; text-wrap: balance; }
+.kicker { font-size: 14px; letter-spacing: 2px; color: var(--muted); margin: 0; }
+.big { font-family: var(--display); font-size: 72px; line-height: .9; margin: 0; font-variant-numeric: tabular-nums; }
+.big span { font-size: .45em; color: var(--muted); }
+#hemi { width: 100%; max-width: 380px; height: auto; }
+.parties { width: 100%; display: grid; gap: 4px; font-size: 14px; }
+.party { display: grid; grid-template-columns: 12px 1fr auto; gap: 8px; align-items: center; text-align: right; }
+.party i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.party b { font-variant-numeric: tabular-nums; }
+.victims { width: 100%; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; max-height: 160px; overflow-y: auto; }
+.victim { font-size: 13px; padding: 2px 8px; border-radius: 999px; background: #24384a; border-inline-start: 4px solid; }
+.victim.head::after { content: " · בול בראש"; color: var(--mustard); }
+.toast { font-size: 13px; color: var(--mustard); min-height: 1.2em; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .btn, .pad { transition: none; } }
+</style>
+
+<div id="app">
+  <div id="stage">
+    <canvas id="game" width="420" height="760" aria-label="מגרש המשחק: גג בניין מעל מדרכה"></canvas>
+
+    <div class="overlay" id="startScreen">
+      <div class="card">
+        <h1 class="logo">שלשלת<small>בחירות 2026</small></h1>
+        <p class="lede">אתה על הגג. למטה עוברים 120 חברי כנסת בדרך לקלפי. יש לך קיבה מלאה ודעה פוליטית.</p>
+        <ul class="rules">
+          <li><b>+3</b><span>פגיעה בראש של ח״כ (בול!)</span></li>
+          <li><b>+1</b><span>פגיעה בגוף. רצף פגיעות מכפיל את הניקוד</span></li>
+          <li><b>0</b><span>ח״כ עם מטריית חסינות. החרא מחליק</span></li>
+          <li><b>−3</b><span>פגעת באזרח מן השורה. זה בוחר!</span></li>
+        </ul>
+        <p class="hint">החרא נופל שנייה שלמה, אז תכוון קדימה. גרור או ◀ ▶ לזוז, הקשה או 💩 לשחרר. במקלדת: חיצים ורווח.</p>
+        <button class="btn" id="startBtn" type="button">לשלשל!</button>
+        <p class="hint" id="bestLine"></p>
+      </div>
+    </div>
+
+    <div class="overlay" id="endScreen" hidden>
+      <div class="card">
+        <p class="kicker">תוצאות האמת · קלפי 120</p>
+        <h2 class="verdict" id="verdict"></h2>
+        <p class="big" id="bigCount"></p>
+        <p class="lede" id="endLede"></p>
+        <svg id="hemi" viewBox="0 0 340 186" role="img" aria-label="מליאת הכנסת: מושבים שלשלת עליהם בחום"></svg>
+        <div class="parties" id="partyList"></div>
+        <p class="kicker">את מי שלשלת היום בבחירות</p>
+        <div class="victims" id="victims"></div>
+        <div class="row">
+          <button class="btn" id="againBtn" type="button">עוד סיבוב</button>
+          <button class="btn ghost" id="shareBtn" type="button">העתק תוצאה</button>
+        </div>
+        <p class="toast" id="toast"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="deck">
+    <button class="pad" id="leftBtn" type="button" aria-label="זוז שמאלה">◀</button>
+    <button class="pad drop" id="dropBtn" type="button" aria-label="שחרר">💩</button>
+    <button class="pad" id="rightBtn" type="button" aria-label="זוז ימינה">▶</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const W = 420, H = 760, ROOF = 150, GROUND = 676, G = 900, TOTAL = 120;
+  const cvs = document.getElementById('game');
+  const ctx = cvs.getContext('2d');
+
+  // ---------- fictional parties & members ----------
+  const PARTIES = [
+    { name: 'סיעת הכיסא הנצחי',      color: '#3d7bd9', seats: 28 },
+    { name: 'יש מה לחלק',             color: '#2fb6a3', seats: 22 },
+    { name: 'הבית הדרום־צפוני',       color: '#e08a2c', seats: 17 },
+    { name: 'התנועה לנאומים ארוכים',  color: '#c94b8c', seats: 14 },
+    { name: 'רשימת הוועדות המאוחדת',  color: '#8a63d2', seats: 12 },
+    { name: 'אחדות לפעמים',           color: '#d9cf3d', seats: 11 },
+    { name: 'הירוקים מקנאה',          color: '#59b84a', seats: 9 },
+    { name: 'מפלגת הקואליציה הזמנית', color: '#e2574c', seats: 7 },
+  ];
+  const FIRST = ['אבי','יוסי','מירי','שלומי','רונית','דודו','אורנה','מוטי','שרון','גלית','קובי','בני','אתי','רמי','חני','ששון','פנינה','ניסים','לימור','עמוס','אילנה','צחי','סיגל','חיים','זהבה','אלי','נורית','שמוליק','דנה','רפי'];
+  const LAST = ['כיסאי','נאומי','ועדתי','פרוטוקולי','הצבעון','דיונוב','קואליציוני','אופוזיצקי','תקציבי','חסינותי','מליאתי','פריימריזון','שולחני','הסכמי','מנדטי','סעיפי','תיקוני','מקורבי','ג׳ובניק','הדלפון','שריונוב','רוטציה','פיליבסטר','ויכוחי'];
+  const QUOTES = ['שערורייה!','זו רדיפה פוליטית!','ועדת חקירה ממלכתית!','פייק ניוז!','אני לא יורד מהכיסא!','אגיש הצעת חוק!','הכול באשמת השמאל!','הכול באשמת הימין!','זה ייכנס לפרוטוקול!','אני מחזיק פה רוב!','איפה היועמ״ש?!','זה החליפה מהפריימריז!'];
+  const CIT_QUOTES = ['אני רק הלכתי לקנות לחם!','זה מה שמקבל בוחר?','אני מצביע מחר בבוקר...','אוי, הנעליים!'];
+  const SUITS = ['#26324a','#3b3f46','#1e1f24','#4a3b30','#2f3c33','#514a5c'];
+  const SKIN = ['#f1c9a5','#e0ac83','#c98e64','#a8714c','#f5d6bd','#8d5a3b'];
+  const HAIR = ['#2a1c12','#4a3020','#9a9a9a','#d8d8d8','#6b4a2a','#141414'];
+  const SHIRTS = ['#e85d4a','#3fa7d6','#f2c230','#6bbf59','#ef8bb3','#ffffff'];
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = a => a[(Math.random() * a.length) | 0];
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  function buildMembers() {
+    const used = new Set(), list = [];
+    PARTIES.forEach((p, pi) => {
+      for (let i = 0; i < p.seats; i++) {
+        let n; do { n = pick(FIRST) + ' ' + pick(LAST); } while (used.has(n));
+        used.add(n);
+        list.push({ name: n, party: pi, hit: null });
+      }
+    });
+    return list;
+  }
+
+  function makeLook(kind) {
+    return {
+      skin: pick(SKIN), hair: pick(HAIR), hairStyle: (Math.random() * 6) | 0,
+      glasses: Math.random() < .3, stache: Math.random() < .25,
+      suit: kind === 'mk' ? pick(SUITS) : pick(SHIRTS), pants: kind === 'mk' ? '#1b1d22' : '#3a5a8c',
+      plump: rnd(0, 4),
+    };
+  }
+
+  // ---------- state ----------
+  let S;
+  function newState() {
+    const members = buildMembers();
+    return {
+      running: false, over: false, t: 0,
+      members, queue: shuffle(members.slice()), spawned: 0, nextSpawn: 1.2,
+      people: [], blobs: [], splats: [], parts: [], texts: [],
+      px: W / 2, pvx: 0, target: null, squat: 0,
+      gut: 100, score: 0, combo: 0, best: 0, hits: 0, heads: 0, citizens: 0,
+      shake: 0,
+    };
+  }
+  S = newState();
+
+  // ---------- audio ----------
+  let AC = null;
+  function audio() { try { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) { AC = null; } return AC; }
+  function noiseBuf(a, dur) { const b = a.createBuffer(1, a.sampleRate * dur, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
+  function fart() {
+    const a = audio(); if (!a) return; const t = a.currentTime, dur = rnd(.22, .4);
+    const o = a.createOscillator(), g = a.createGain(), lfo = a.createOscillator(), lg = a.createGain(), f = a.createBiquadFilter();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(rnd(70, 110), t); o.frequency.exponentialRampToValueAtTime(rnd(40, 60), t + dur);
+    lfo.frequency.value = rnd(18, 32); lg.gain.value = 25; lfo.connect(lg); lg.connect(o.frequency);
+    f.type = 'lowpass'; f.frequency.value = 600;
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.35, t + .03); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(f); f.connect(g); g.connect(a.destination); o.start(t); lfo.start(t); o.stop(t + dur); lfo.stop(t + dur);
+  }
+  function splatSnd(vol = .5, hz = 900) {
+    const a = audio(); if (!a) return; const t = a.currentTime;
+    const s = a.createBufferSource(); s.buffer = noiseBuf(a, .18);
+    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = .8;
+    const g = a.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + .17);
+    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t);
+  }
+
+  // ---------- canvas sizing ----------
+  let scale = 1, dpr = 1, bg = null;
+  function resize() {
+    const st = document.getElementById('stage').getBoundingClientRect();
+    scale = Math.min(st.width / W, st.height / H);
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cvs.style.width = (W * scale) + 'px'; cvs.style.height = (H * scale) + 'px';
+    cvs.width = Math.round(W * scale * dpr); cvs.height = Math.round(H * scale * dpr);
+    bg = renderBackground(scale * dpr);
+  }
+
+  // ---------- static background ----------
+  function renderBackground(k) {
+    const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
+    const g = c.getContext('2d'); g.scale(k, k);
+    // sky
+    const sky = g.createLinearGradient(0, 0, 0, ROOF); sky.addColorStop(0, '#0d1820'); sky.addColorStop(1, '#2b3d4a');
+    g.fillStyle = sky; g.fillRect(0, 0, W, ROOF);
+    g.fillStyle = 'rgba(255,255,230,.7)';
+    for (let i = 0; i < 40; i++) { const x = (i * 97) % W, y = (i * 53) % (ROOF - 30); g.fillRect(x, y, 1.5, 1.5); }
+    g.fillStyle = '#f4ecd8'; g.beginPath(); g.arc(60, 112, 14, 0, 7); g.fill();
+    g.fillStyle = '#0d1820'; g.beginPath(); g.arc(53, 108, 12, 0, 7); g.fill();
+    // facade
+    g.fillStyle = '#b9a98c'; g.fillRect(0, ROOF, W, GROUND - ROOF);
+    g.fillStyle = 'rgba(0,0,0,.06)';
+    for (let y = ROOF + 14; y < GROUND - 60; y += 14) g.fillRect(0, y, W, 1);
+    // windows
+    const cols = 5, cw = 46, ch = 58, gx = (W - cols * cw) / (cols + 1);
+    for (let r = 0; r < 5; r++) for (let col = 0; col < cols; col++) {
+      const x = gx + col * (cw + gx), y = ROOF + 40 + r * 82;
+      if (r === 2 && (col === 1 || col === 2 || col === 3)) continue; // banner space
+      g.fillStyle = '#3a3226'; g.fillRect(x - 3, y - 3, cw + 6, ch + 6);
+      const lit = ((r * 7 + col * 3) % 5) < 2;
+      g.fillStyle = lit ? '#f6d77a' : '#24323d'; g.fillRect(x, y, cw, ch);
+      g.fillStyle = '#3a3226'; g.fillRect(x + cw / 2 - 1.5, y, 3, ch); g.fillRect(x, y + ch / 2 - 1.5, cw, 3);
+      if ((r + col) % 4 === 1) { g.fillStyle = '#d6d2c8'; g.fillRect(x + 4, y + ch + 4, cw - 8, 14); g.fillStyle = '#9a968c'; for (let i = 0; i < 4; i++) g.fillRect(x + 8 + i * 8, y + ch + 7, 4, 8); }
+    }
+    // election banner
+    const by = ROOF + 40 + 2 * 82;
+    g.fillStyle = '#f4ecd8'; g.fillRect(80, by, 260, 58);
+    g.fillStyle = '#2b5fb0'; g.fillRect(80, by, 260, 8); g.fillRect(80, by + 50, 260, 8);
+    g.fillStyle = '#1b2733'; g.font = '700 30px Karantina, Assistant, sans-serif'; g.textAlign = 'center'; g.direction = 'rtl';
+    g.fillText('בחירות לכנסת ה־26 · קלפי 120', W / 2, by + 39);
+    // street level
+    g.fillStyle = '#7e705c'; g.fillRect(0, GROUND - 72, W, 8);
+    g.fillStyle = '#4b3b2b'; g.fillRect(160, GROUND - 64, 100, 64);
+    g.fillStyle = '#f2c230'; g.fillRect(170, GROUND - 92, 80, 22);
+    g.fillStyle = '#1b2733'; g.font = '700 20px Karantina, Assistant, sans-serif'; g.fillText('קלפי ⬅', 210, GROUND - 75);
+    // posters
+    [[30, '#3d7bd9'], [320, '#e08a2c']].forEach(([x, c]) => {
+      g.fillStyle = c; g.fillRect(x, GROUND - 60, 64, 44);
+      g.fillStyle = '#f4ecd8'; g.beginPath(); g.arc(x + 20, GROUND - 40, 10, 0, 7); g.fill();
+      g.fillRect(x + 34, GROUND - 48, 24, 4); g.fillRect(x + 34, GROUND - 40, 18, 4); g.fillRect(x + 34, GROUND - 32, 22, 4);
+    });
+    // sidewalk + road
+    g.fillStyle = '#a19a8e'; g.fillRect(0, GROUND - 4, W, 30);
+    g.fillStyle = 'rgba(0,0,0,.12)'; for (let x = 0; x < W; x += 30) g.fillRect(x, GROUND - 4, 1.5, 30);
+    g.fillStyle = '#d8d2c4'; g.fillRect(0, GROUND + 26, W, 6);
+    g.fillStyle = '#33363b'; g.fillRect(0, GROUND + 32, W, H - GROUND - 32);
+    g.fillStyle = '#e6e0cf'; for (let x = 10; x < W; x += 60) g.fillRect(x, GROUND + 56, 32, 4);
+    // roof parapet
+    g.fillStyle = '#8f8270'; g.fillRect(0, ROOF, W, 14);
+    g.fillStyle = '#6f6455'; g.fillRect(0, ROOF + 14, W, 4);
+    return c;
+  }
+
+  // ---------- drawing helpers ----------
+  function ell(x, y, rx, ry, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fill(); }
+  function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+  function drawPoop(x, y, s = 1, rot = 0) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+    ctx.fillStyle = '#5e3714'; ell(0, 0, 12, 6); ell(0, -6, 9, 5); ell(0, -11, 6, 4);
+    ctx.beginPath(); ctx.moveTo(-3, -13); ctx.quadraticCurveTo(2, -20, 1, -17); ctx.quadraticCurveTo(4, -15, 3, -12); ctx.fill();
+    ctx.fillStyle = '#a8692f'; ell(-4, -1, 4, 1.6); ell(-3, -7, 3, 1.3); ell(-2, -12, 2, 1);
+    ctx.restore();
+  }
+
+  function drawHead(p, L, d) {
+    const hy = -74;
+    ctx.fillStyle = L.skin; ctx.fillRect(-4, -62, 8, 6);
+    if (L.hairStyle === 3) { ctx.fillStyle = L.hair; ell(-d * 3, hy + 6, 16, 18); }
+    ctx.fillStyle = L.skin; circ(0, hy, 15);
+    circ(-d * 12, hy + 1, 4);
+    // hair
+    ctx.fillStyle = L.hair;
+    switch (L.hairStyle) {
+      case 0: ell(-d * 10, hy - 4, 5, 7); break; // bald with tuft
+      case 1: ctx.beginPath(); ctx.arc(0, hy - 2, 15.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); ell(d * 4, hy - 13, 9, 4, d * .3); break;
+      case 2: ctx.beginPath(); ctx.arc(0, hy - 2, 15.5, Math.PI * 1.1, Math.PI * 1.9); ctx.fill(); ctx.fillStyle = '#1f2a6b'; ell(-d * 2, hy - 15, 8, 3); break;
+      case 3: ctx.beginPath(); ctx.arc(0, hy - 3, 16, Math.PI, Math.PI * 2); ctx.fill(); break;
+      case 4: for (let i = 0; i < 6; i++) circ(-13 + i * 5.2, hy - 12 + Math.abs(i - 2.5) * 1.5, 5); break;
+      default: ctx.beginPath(); ctx.arc(0, hy - 1, 15.5, Math.PI * 1.0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.25)'; ell(-d * 3, hy - 11, 8, 2); break;
+    }
+    // face
+    const ex = d * 4, ey = hy - 2;
+    ctx.fillStyle = '#fff'; circ(ex, ey, 3.6); circ(ex + d * 7, ey, 3.2);
+    ctx.fillStyle = '#111'; circ(ex + d * 1.2, ey + .4, 1.6); circ(ex + d * 8, ey + .4, 1.5);
+    if (L.glasses) { ctx.strokeStyle = '#111'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(ex, ey, 4.6, 0, 7); ctx.moveTo(ex + d * 11.6, ey); ctx.arc(ex + d * 7, ey, 4.4, 0, 7); ctx.stroke(); }
+    ctx.fillStyle = shade(L.skin, -25); ell(d * 14, hy + 3, 4, 3.4);
+    if (L.stache) { ctx.fillStyle = L.hair; ell(d * 9, hy + 8, 6, 2.2); }
+    ctx.strokeStyle = '#5a2a1a'; ctx.lineWidth = 1.6; ctx.beginPath();
+    if (p.hit) { ctx.arc(d * 8, hy + 12, 3.2, 0, Math.PI * 2); } else { ctx.arc(d * 7, hy + 7, 4, .2 * Math.PI, .8 * Math.PI); }
+    ctx.stroke();
+  }
+
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const c = v => Math.max(0, Math.min(255, v + amt));
+    return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`;
+  }
+
+  function drawPerson(p) {
+    const L = p.look, d = p.dir, s = Math.sin(p.phase);
+    ctx.save(); ctx.translate(p.x, GROUND);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ell(0, 2, 18, 4);
+    // back arm
+    const arm = (sign, len) => { ctx.save(); ctx.translate(0, -54); ctx.rotate(sign * s * .6); ctx.fillStyle = shade(L.suit, -20); ctx.fillRect(-3.5, 0, 7, len); ctx.fillStyle = L.skin; circ(0, len + 2, 3.5); ctx.restore(); };
+    arm(1, 22);
+    // legs
+    for (const i of [-1, 1]) {
+      ctx.save(); ctx.translate(i * 4, -30); ctx.rotate(i * s * .5);
+      ctx.fillStyle = L.pants; ctx.fillRect(-4, 0, 8, 27);
+      ctx.fillStyle = '#111'; ell(d * 3, 28, 7, 3.5); ctx.restore();
+    }
+    // torso
+    const w = 14 + L.plump;
+    ctx.fillStyle = L.suit;
+    ctx.beginPath(); ctx.moveTo(-w, -60); ctx.lineTo(w, -60); ctx.lineTo(w - 1, -28); ctx.lineTo(-w + 1, -28); ctx.closePath(); ctx.fill();
+    if (p.kind === 'mk') {
+      const pc = PARTIES[p.member.party].color;
+      ctx.fillStyle = '#f4f4f0'; ctx.beginPath(); ctx.moveTo(-5, -60); ctx.lineTo(5, -60); ctx.lineTo(0, -45); ctx.fill();
+      ctx.fillStyle = pc; ctx.beginPath(); ctx.moveTo(-2.4, -58); ctx.lineTo(2.4, -58); ctx.lineTo(3.2, -38); ctx.lineTo(0, -34); ctx.lineTo(-3.2, -38); ctx.fill();
+      circ(-d * 8, -52, 2);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,.6)'; circ(0, -46, 5);
+    }
+    // front arm + briefcase / bag
+    ctx.save(); ctx.translate(0, -54); ctx.rotate(-s * .6);
+    ctx.fillStyle = shade(L.suit, 12); ctx.fillRect(-3.5, 0, 7, 22); ctx.fillStyle = L.skin; circ(0, 24, 3.5);
+    if (!p.umbrella) {
+      if (p.kind === 'mk') { ctx.fillStyle = '#5a3a1e'; ctx.fillRect(-9, 25, 18, 13); ctx.fillStyle = '#c7a24a'; ctx.fillRect(-2, 27, 4, 2); }
+      else { ctx.fillStyle = '#e9e3d3'; ctx.fillRect(-7, 25, 14, 16); ctx.fillStyle = '#c8a24a'; ell(0, 25, 5, 3); }
+    }
+    ctx.restore();
+    drawHead(p, L, d);
+    if (p.umbrella) {
+      ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(d * 10, -36); ctx.lineTo(d * 4, -104); ctx.stroke();
+      ctx.fillStyle = '#16161b'; ctx.beginPath(); ctx.arc(d * 4, -100, 32, Math.PI, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = PARTIES[p.member.party].color;
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(d * 4, -100); ctx.arc(d * 4, -100, 32, Math.PI + i * Math.PI / 4, Math.PI + (i + .5) * Math.PI / 4); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = '#f4ecd8'; ctx.font = '700 13px Karantina, Assistant, sans-serif'; ctx.textAlign = 'center'; ctx.direction = 'rtl';
+      ctx.fillText('חסינות', d * 4, -106);
+    }
+    if (p.hit) {
+      ctx.fillStyle = '#5e3714';
+      if (p.hit === 'head') { ell(0, -88, 15, 6); ell(-6, -84, 4, 9); ell(7, -82, 3, 10); ell(0, -94, 8, 5); }
+      else { ell(0, -48, 10, 7); ell(4, -40, 3, 9); }
+      // flies
+      ctx.fillStyle = '#111';
+      for (let i = 0; i < 3; i++) { const a = S.t * 6 + i * 2.1; circ(Math.cos(a) * 22, -96 + Math.sin(a * 1.3) * 8, 1.6); }
+    }
+    ctx.restore();
+    if (p.bubbleT > 0 && p.bubble) {
+      ctx.save(); ctx.font = '700 15px Assistant, sans-serif'; ctx.direction = 'rtl'; ctx.textAlign = 'center';
+      const tw = ctx.measureText(p.bubble).width + 16, bx = Math.max(tw / 2 + 4, Math.min(W - tw / 2 - 4, p.x)), by = GROUND - 140;
+      ctx.globalAlpha = Math.min(1, p.bubbleT * 3);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(bx - tw / 2, by - 15, tw, 24, 10); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(p.x - 5, by + 9); ctx.lineTo(p.x + 5, by + 9); ctx.lineTo(p.x, by + 18); ctx.fill();
+      ctx.fillStyle = '#1b2733'; ctx.fillText(p.bubble, bx, by + 3); ctx.restore();
+    }
+  }
+
+  function drawPlayer() {
+    const x = S.px, y = ROOF, q = S.squat;
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = '#1b1d22'; ell(-9, -3, 7, 3.5); ell(9, -3, 7, 3.5);
+    ctx.fillStyle = '#3a5a8c'; ctx.fillRect(-14, -18 + q * 4, 28, 12);
+    ctx.fillStyle = '#e85d4a'; ctx.beginPath(); ctx.roundRect(-15, -46 + q * 6, 30, 30, 8); ctx.fill();
+    ctx.fillStyle = '#f1c9a5'; circ(0, -58 + q * 6, 13);
+    ctx.fillStyle = '#2c4352'; ctx.beginPath(); ctx.arc(0, -61 + q * 6, 13.5, Math.PI, 0); ctx.fill(); ctx.fillRect(-20, -62 + q * 6, 10, 4);
+    ctx.fillStyle = '#111'; circ(-4, -56 + q * 6, 1.6); circ(5, -56 + q * 6, 1.6);
+    ctx.strokeStyle = '#5a2a1a'; ctx.lineWidth = 1.6; ctx.beginPath();
+    if (q > .2) ctx.arc(0, -50 + q * 6, 3, 0, Math.PI * 2); else ctx.arc(0, -52, 4, .15 * Math.PI, .85 * Math.PI);
+    ctx.stroke();
+    // newspaper
+    ctx.fillStyle = '#efe9da'; ctx.fillRect(10, -44 + q * 6, 18, 22); ctx.fillStyle = '#9a968c'; for (let i = 0; i < 4; i++) ctx.fillRect(13, -40 + i * 5 + q * 6, 12, 2);
+    ctx.restore();
+  }
+
+  function drawHUD() {
+    ctx.save(); ctx.direction = 'rtl';
+    ctx.fillStyle = '#f4ecd8'; ctx.textAlign = 'right';
+    ctx.font = '700 34px Karantina, Assistant, sans-serif'; ctx.fillText(`ניקוד ${S.score}`, W - 14, 38);
+    ctx.font = '600 15px Assistant, sans-serif';
+    const left = TOTAL - S.spawned + S.people.filter(p => p.kind === 'mk').length;
+    ctx.fillText(`ח״כים שעוד בדרך לקלפי: ${left}/${TOTAL}`, W - 14, 60);
+    ctx.fillText(`פגעת ב־${S.hits}`, W - 14, 80);
+    // gut meter
+    ctx.textAlign = 'left'; ctx.fillText('מעיים', 14, 30);
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(14, 38, 120, 12);
+    ctx.fillStyle = S.gut >= 20 ? '#a8692f' : '#e2574c'; ctx.fillRect(14, 38, 120 * S.gut / 100, 12);
+    ctx.strokeStyle = '#f4ecd8'; ctx.lineWidth = 1; ctx.strokeRect(14.5, 38.5, 119, 11);
+    const m = mult();
+    if (S.combo > 1) { ctx.fillStyle = '#f2c230'; ctx.font = '700 26px Karantina, Assistant, sans-serif'; ctx.fillText(`רצף ${S.combo} · x${m}`, 14, 76); }
+    ctx.restore();
+  }
+
+  // ---------- game logic ----------
+  const mult = () => Math.min(5, 1 + Math.floor(S.combo / 3));
+  const progress = () => S.spawned / TOTAL;
+
+  function spawnOne(kind) {
+    const dir = Math.random() < .5 ? 1 : -1;
+    const p = { kind, dir, x: dir > 0 ? -30 : W + 30, phase: Math.random() * 6, look: makeLook(kind), hit: null, bubble: '', bubbleT: 0 };
+    if (kind === 'mk') {
+      p.member = S.queue[S.spawned++];
+      p.speed = rnd(45, 75) + progress() * 55;
+      p.umbrella = Math.random() < .05 + progress() * .15;
+    } else { p.speed = rnd(35, 60); }
+    S.people.push(p);
+  }
+
+  function spawnTick(dt) {
+    S.nextSpawn -= dt;
+    if (S.nextSpawn > 0 || S.spawned >= TOTAL) return;
+    const pr = progress();
+    if (Math.random() < .14) spawnOne('cit');
+    else {
+      spawnOne('mk');
+      if (pr > .25 && Math.random() < .25 && S.spawned < TOTAL) { spawnOne('mk'); S.people[S.people.length - 1].x += -S.people[S.people.length - 1].dir * 40; }
+    }
+    S.nextSpawn = rnd(.8, 1.3) * (1.5 - pr * .9);
+  }
+
+  function drop() {
+    if (!S.running) return;
+    if (S.gut < 20) { addText(S.px, ROOF + 44, 'המעיים ריקים...', '#e2574c'); return; }
+    S.gut -= 20; S.squat = 1;
+    S.blobs.push({ x: S.px, y: ROOF + 6, vx: S.pvx * .35, vy: 30, rot: 0 });
+    fart();
+  }
+
+  function addText(x, y, text, color = '#f2c230', size = 26) { S.texts.push({ x, y, text, color, size, t: 1.1 }); }
+  function burst(x, y, n = 10) { for (let i = 0; i < n; i++) S.parts.push({ x, y, vx: rnd(-120, 120), vy: rnd(-220, -40), t: rnd(.4, .8) }); }
+
+  function land(b, onGround) {
+    burst(b.x, b.y, onGround ? 8 : 12);
+    splatSnd(.45, onGround ? 600 : 900);
+  }
+
+  function hitPerson(b, p, zone) {
+    land(b, false);
+    if (p.kind === 'cit') {
+      S.score -= 3; S.combo = 0; S.citizens++;
+      addText(p.x, GROUND - 120, 'זה בוחר! −3', '#e2574c');
+      p.hit = p.hit || zone; p.bubble = pick(CIT_QUOTES); p.bubbleT = 1.6; p.speed *= 1.6;
+      return;
+    }
+    if (p.hit) { S.score += 1; addText(p.x, GROUND - 120, 'עוד מנה +1'); return; }
+    S.combo++; const m = mult(), pts = (zone === 'head' ? 3 : 1) * m;
+    S.score += pts; S.hits++; if (zone === 'head') { S.heads++; S.shake = .25; }
+    S.best = Math.max(S.best, S.combo);
+    p.hit = zone; p.member.hit = zone; p.bubble = pick(QUOTES); p.bubbleT = 1.8; p.speed *= 1.7;
+    addText(p.x, GROUND - 120, zone === 'head' ? `בול! +${pts}` : `+${pts}`);
+  }
+
+  function update(dt) {
+    S.t += dt;
+    // movement
+    let ax = 0;
+    if (keys.left) ax -= 1; if (keys.right) ax += 1;
+    if (ax) { S.target = null; S.pvx = ax * 280; }
+    else if (S.target != null) { const dx = S.target - S.px; S.pvx = Math.abs(dx) < 3 ? 0 : Math.sign(dx) * Math.min(320, Math.abs(dx) * 9); }
+    else S.pvx = 0;
+    S.px = Math.max(24, Math.min(W - 24, S.px + S.pvx * dt));
+    S.squat = Math.max(0, S.squat - dt * 4);
+    S.gut = Math.min(100, S.gut + dt * 24);
+    S.shake = Math.max(0, S.shake - dt);
+
+    spawnTick(dt);
+
+    for (const p of S.people) {
+      p.x += p.dir * p.speed * dt; p.phase += dt * p.speed * .11;
+      if (p.bubbleT > 0) p.bubbleT -= dt;
+    }
+    S.people = S.people.filter(p => p.x > -60 && p.x < W + 60);
+
+    for (const b of S.blobs) {
+      b.vy += G * dt; b.y += b.vy * dt; b.x += b.vx * dt; b.rot += dt * 3;
+      for (const p of S.people) {
+        const dx = b.x - p.x;
+        if (p.umbrella && Math.abs(dx - p.dir * 4) < 32 && b.y > GROUND - 134 && b.y < GROUND - 98) {
+          b.dead = true; burst(b.x, b.y, 6); splatSnd(.3, 1400);
+          addText(p.x, GROUND - 150, 'חסינות!', '#9fb3bf', 22); break;
+        }
+        const hy = GROUND - 74;
+        if (Math.hypot(dx, b.y - hy) < 20) { b.dead = true; hitPerson(b, p, 'head'); break; }
+        if (Math.abs(dx) < 16 && b.y > GROUND - 60 && b.y < GROUND - 4) { b.dead = true; hitPerson(b, p, 'body'); break; }
+      }
+      if (!b.dead && b.y >= GROUND + 8) {
+        b.dead = true; land(b, true); S.combo = 0;
+        S.splats.push({ x: b.x, y: GROUND + rnd(4, 18), t: 8, r: rnd(.8, 1.2) });
+      }
+    }
+    S.blobs = S.blobs.filter(b => !b.dead);
+    for (const q of S.parts) { q.vy += G * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.t -= dt; }
+    S.parts = S.parts.filter(q => q.t > 0);
+    for (const s of S.splats) s.t -= dt;
+    S.splats = S.splats.filter(s => s.t > 0);
+    for (const tx of S.texts) { tx.t -= dt; tx.y -= dt * 40; }
+    S.texts = S.texts.filter(tx => tx.t > 0);
+
+    if (S.spawned >= TOTAL && !S.people.some(p => p.kind === 'mk') && S.blobs.length === 0) endGame();
+  }
+
+  function render() {
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    if (S.shake > 0) ctx.translate(rnd(-3, 3) * S.shake * 4, rnd(-3, 3) * S.shake * 4);
+    if (bg) ctx.drawImage(bg, 0, 0, W, H);
+    for (const s of S.splats) {
+      ctx.globalAlpha = Math.min(1, s.t / 2); ctx.fillStyle = '#5e3714';
+      ell(s.x, s.y, 14 * s.r, 4 * s.r); ell(s.x - 9 * s.r, s.y + 2, 5, 2); ell(s.x + 11 * s.r, s.y - 1, 4, 2);
+    }
+    ctx.globalAlpha = 1;
+    const ppl = S.people.slice().sort((a, b) => (a.kind === 'cit') - (b.kind === 'cit'));
+    ppl.forEach(drawPerson);
+    drawPlayer();
+    for (const b of S.blobs) drawPoop(b.x, b.y, 1, Math.sin(b.rot) * .3);
+    ctx.fillStyle = '#6b3d16';
+    for (const q of S.parts) circ(q.x, q.y, 2.6);
+    ctx.save(); ctx.textAlign = 'center'; ctx.direction = 'rtl';
+    for (const tx of S.texts) {
+      ctx.globalAlpha = Math.min(1, tx.t * 2); ctx.font = `700 ${tx.size}px Karantina, Assistant, sans-serif`;
+      ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(tx.text, tx.x, tx.y); ctx.fillStyle = tx.color; ctx.fillText(tx.text, tx.x, tx.y);
+    }
+    ctx.restore();
+    if (S.running || S.over) drawHUD();
+  }
+
+  let last = 0;
+  function frame(ts) {
+    const dt = Math.min(.05, (ts - last) / 1000 || 0); last = ts;
+    if (S.running) update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- screens ----------
+  const $ = id => document.getElementById(id);
+  function bestScore() { try { return +(localStorage.getItem('shilshelet-best') || 0); } catch (e) { return 0; } }
+  function saveBest(v) { try { localStorage.setItem('shilshelet-best', String(v)); } catch (e) {} }
+  function showBest() { const b = bestScore(); $('bestLine').textContent = b ? `השיא שלך: ${b} נקודות` : ''; }
+
+  function start() {
+    audio();
+    S = newState(); S.running = true;
+    $('startScreen').hidden = true; $('endScreen').hidden = true;
+    cvs.focus?.();
+  }
+
+  const VERDICTS = [
+    [0, 'שלשול קל. לא עברת את אחוז החסימה'],
+    [.1, 'עברת את אחוז החסימה, בקושי'],
+    [.3, 'שר בכיר במשרד הביוב'],
+    [.5, 'יו״ר ועדת הכספים. והכפפות'],
+    [.75, 'ראש ממשלת השלשולים'],
+    [.95, 'רוב מוחלט. הכנסת מפוזרת'],
+  ];
+
+  function endGame() {
+    S.running = false; S.over = true;
+    const ratio = S.hits / TOTAL;
+    let v = VERDICTS[0][1]; for (const [th, txt] of VERDICTS) if (ratio >= th) v = txt;
+    $('verdict').textContent = v;
+    $('bigCount').innerHTML = `${S.hits}<span> / 120 ח״כים</span>`;
+    const parts = [`${S.score} נקודות`, `${S.heads} בול בראש`, `רצף שיא ${S.best}`];
+    if (S.citizens) parts.push(`${S.citizens} בוחרים תמימים נפגעו`);
+    $('endLede').textContent = parts.join(' · ');
+    drawHemicycle();
+    $('partyList').innerHTML = PARTIES.map((p, i) => {
+      const h = S.members.filter(m => m.party === i && m.hit).length;
+      return `<div class="party"><i style="background:${p.color}"></i><span>${p.name}</span><b>${h}/${p.seats}</b></div>`;
+    }).join('');
+    const victims = S.members.filter(m => m.hit);
+    $('victims').innerHTML = victims.length
+      ? victims.map(m => `<span class="victim${m.hit === 'head' ? ' head' : ''}" style="border-color:${PARTIES[m.party].color}">ח״כ ${m.name}</span>`).join('')
+      : '<span class="hint">אף אחד. כל הכנסת יצאה נקייה, כמו תמיד.</span>';
+    $('toast').textContent = '';
+    if (S.score > bestScore()) saveBest(S.score);
+    $('endScreen').hidden = false;
+    $('againBtn').focus();
+  }
+
+  function drawHemicycle() {
+    const svg = $('hemi'), cx = 170, cy = 176, rows = 8, r0 = 60, dr = 14;
+    const radii = Array.from({ length: rows }, (_, i) => r0 + i * dr), sum = radii.reduce((a, b) => a + b, 0);
+    let counts = radii.map(r => Math.round(TOTAL * r / sum)); counts[rows - 1] += TOTAL - counts.reduce((a, b) => a + b, 0);
+    const seats = [];
+    radii.forEach((r, i) => { const n = counts[i]; for (let k = 0; k < n; k++) { const a = Math.PI - k * Math.PI / (n - 1); seats.push({ a, x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) }); } });
+    seats.sort((p, q) => q.a - p.a);
+    const ordered = []; PARTIES.forEach((p, i) => S.members.filter(m => m.party === i).forEach(m => ordered.push(m)));
+    // party blocs read right-to-left, matching Hebrew
+    seats.reverse();
+    svg.innerHTML = seats.map((s, i) => {
+      const m = ordered[i], c = PARTIES[m.party].color;
+      return m.hit
+        ? `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5.4" fill="#7a4a1f" stroke="${c}" stroke-width="2"><title>ח״כ ${m.name}</title></circle>`
+        : `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5.4" fill="${c}" opacity=".9"><title>ח״כ ${m.name}</title></circle>`;
+    }).join('') + `<text x="170" y="170" text-anchor="middle" fill="#f4ecd8" font-family="Karantina, Assistant, sans-serif" font-size="30" font-weight="700">${S.hits} 💩</text>`;
+  }
+
+  async function share() {
+    const txt = `שלשלתי היום על ${S.hits} מתוך 120 חברי כנסת ב״שלשלת 2026״ 💩 ${S.score} נקודות, ${S.heads} בול בראש. ${$('verdict').textContent}.`;
+    try { await navigator.clipboard.writeText(txt); $('toast').textContent = 'התוצאה הועתקה. עכשיו להדביק בקבוצת הווטסאפ המשפחתית.'; }
+    catch (e) { $('toast').textContent = txt; }
+  }
+
+  // ---------- input ----------
+  const keys = { left: false, right: false };
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+    else if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+    else if (e.key === ' ' || e.key === 'ArrowDown') { if (S.running) { e.preventDefault(); if (!e.repeat) drop(); } }
+    else if (e.key === 'Enter' && !S.running) { e.preventDefault(); start(); }
+  });
+  window.addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+    if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+  });
+  function hold(btn, k) {
+    const on = e => { e.preventDefault(); keys[k] = true; btn.classList.add('held'); S.target = null; };
+    const off = () => { keys[k] = false; btn.classList.remove('held'); };
+    btn.addEventListener('pointerdown', on); ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, off));
+  }
+  hold($('leftBtn'), 'left'); hold($('rightBtn'), 'right');
+  $('dropBtn').addEventListener('pointerdown', e => { e.preventDefault(); drop(); });
+  $('dropBtn').addEventListener('click', e => { if (e.detail === 0) drop(); });
+
+  let drag = null;
+  const toGame = e => { const r = cvs.getBoundingClientRect(); return (e.clientX - r.left) / r.width * W; };
+  cvs.addEventListener('pointerdown', e => { drag = { x0: e.clientX, moved: false }; cvs.setPointerCapture(e.pointerId); });
+  cvs.addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (Math.abs(e.clientX - drag.x0) > 8) drag.moved = true;
+    if (drag.moved) S.target = toGame(e);
+  });
+  cvs.addEventListener('pointerup', () => { if (drag && !drag.moved) drop(); drag = null; });
+  cvs.addEventListener('pointercancel', () => { drag = null; });
+
+  $('startBtn').addEventListener('click', start);
+  $('againBtn').addEventListener('click', start);
+  $('shareBtn').addEventListener('click', share);
+  document.addEventListener('visibilitychange', () => { last = performance.now(); });
+  window.addEventListener('resize', resize);
+
+  showBest();
+  resize();
+  // idle demo crowd behind the start screen
+  for (let i = 0; i < 4; i++) { spawnOne('mk'); S.people[i].x = 60 + i * 95; }
+  S.spawned = 0;
+  requestAnimationFrame(frame);
+  if (document.fonts) document.fonts.ready.then(resize);
+})();
+</script>
