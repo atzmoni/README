@@ -41,7 +41,7 @@ body {
 #stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
 canvas#game { display: block; touch-action: none; border-radius: 6px; }
 #deck {
-  display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 10px; direction: ltr;
+  display: grid; grid-template-columns: .6fr 1fr 1.4fr 1fr; gap: 10px; direction: ltr;
   padding-block: 10px 12px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -54,6 +54,7 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   background: #2c4352; box-shadow: 0 4px 0 #0b141a; cursor: pointer;
 }
 .pad:active, .pad.held { transform: translateY(3px); box-shadow: 0 1px 0 #0b141a; }
+.pad.mute { font-size: 22px; background: #22343f; }
 .pad.drop { background: var(--poop); box-shadow: 0 4px 0 #3b220c; font-size: 32px; }
 .pad:focus-visible, .btn:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
 
@@ -112,14 +113,15 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     <div class="overlay" id="startScreen">
       <div class="card">
         <h1 class="logo">שלשלת<small>בחירות 2026</small></h1>
-        <p class="lede">אתה על הגג. למטה עוברים 120 חברי כנסת בדרך לקלפי. יש לך קיבה מלאה ודעה פוליטית.</p>
+        <p class="lede">אתה על הגג. למטה עוברות 8 מפלגות, סיעה אחרי סיעה, בדרך לקלפי. כל מעטפה שאתה משלשל נפתחת באוויר ומתגלה כמו שהיא באמת. מי שבורח חוזר, והמשחק נגמר רק כשכל 120 חברי הכנסת מלושלשים.</p>
         <ul class="rules">
           <li><b>+3</b><span>פגיעה בראש של ח״כ (בול!)</span></li>
+          <li><b>+10</b><span>על כל סיעה שמלושלשת במלואה, וגדל מגל לגל</span></li>
           <li><b>+1</b><span>פגיעה בגוף. רצף פגיעות מכפיל את הניקוד</span></li>
-          <li><b>0</b><span>ח״כ עם מטריית חסינות. החרא מחליק</span></li>
+          <li><b>0</b><span>מטריית חסינות עוצרת מנה אחת, ואז עפה</span></li>
           <li><b>−3</b><span>פגעת באזרח מן השורה. זה בוחר!</span></li>
         </ul>
-        <p class="hint">החרא נופל שנייה שלמה, אז תכוון קדימה. גרור או ◀ ▶ לזוז, הקשה או 💩 לשחרר. במקלדת: חיצים ורווח.</p>
+        <p class="hint">המעטפה נופלת שנייה שלמה, אז תכוון קדימה. המעיים ריקים? עצירות, תחכה רגע. גרור או ◀ ▶ לזוז, הקשה או 💩 לשחרר. במקלדת: חיצים ורווח.</p>
         <button class="btn" id="startBtn" type="button">לשלשל!</button>
         <p class="hint" id="bestLine"></p>
       </div>
@@ -131,7 +133,7 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
         <h2 class="verdict" id="verdict"></h2>
         <p class="big" id="bigCount"></p>
         <p class="lede" id="endLede"></p>
-        <svg id="hemi" viewBox="0 0 340 186" role="img" aria-label="מליאת הכנסת: מושבים שלשלת עליהם בחום"></svg>
+        <svg id="hemi" viewBox="0 0 340 186" role="img" aria-label="מליאת הכנסת המלושלשת. נקודה צהובה מסמנת בול בראש"></svg>
         <div class="parties" id="partyList"></div>
         <p class="kicker">את מי שלשלת היום בבחירות</p>
         <div class="victims" id="victims"></div>
@@ -145,6 +147,7 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   </div>
 
   <div id="deck">
+    <button class="pad mute" id="muteBtn" type="button" aria-label="השתקה">🔊</button>
     <button class="pad" id="leftBtn" type="button" aria-label="זוז שמאלה">◀</button>
     <button class="pad drop" id="dropBtn" type="button" aria-label="שחרר">💩</button>
     <button class="pad" id="rightBtn" type="button" aria-label="זוז ימינה">▶</button>
@@ -208,8 +211,9 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     const members = buildMembers();
     return {
       running: false, over: false, t: 0,
-      members, queue: shuffle(members.slice()), spawned: 0, nextSpawn: 1.2,
-      people: [], blobs: [], splats: [], parts: [], texts: [],
+      members, wave: -1, waveQueue: [], nextSpawn: 1.2, banner: null, finishing: 0,
+      people: [], blobs: [], splats: [], parts: [], texts: [], papers: [],
+      drops: 0, loading: false, lastStrain: -9, nextGurgle: 5,
       px: W / 2, pvx: 0, target: null, squat: 0,
       gut: 100, score: 0, combo: 0, best: 0, hits: 0, heads: 0, citizens: 0,
       shake: 0,
@@ -218,24 +222,263 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   S = newState();
 
   // ---------- audio ----------
-  let AC = null;
-  function audio() { try { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) { AC = null; } return AC; }
-  function noiseBuf(a, dur) { const b = a.createBuffer(1, a.sampleRate * dur, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
-  function fart() {
-    const a = audio(); if (!a) return; const t = a.currentTime, dur = rnd(.22, .4);
-    const o = a.createOscillator(), g = a.createGain(), lfo = a.createOscillator(), lg = a.createGain(), f = a.createBiquadFilter();
-    o.type = 'sawtooth'; o.frequency.setValueAtTime(rnd(70, 110), t); o.frequency.exponentialRampToValueAtTime(rnd(40, 60), t + dur);
-    lfo.frequency.value = rnd(18, 32); lg.gain.value = 25; lfo.connect(lg); lg.connect(o.frequency);
-    f.type = 'lowpass'; f.frequency.value = 600;
-    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.35, t + .03); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-    o.connect(f); f.connect(g); g.connect(a.destination); o.start(t); lfo.start(t); o.stop(t + dur); lfo.stop(t + dur);
-  }
-  function splatSnd(vol = .5, hz = 900) {
-    const a = audio(); if (!a) return; const t = a.currentTime;
-    const s = a.createBufferSource(); s.buffer = noiseBuf(a, .18);
-    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = .8;
-    const g = a.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + .17);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t);
+  // Every sound is synthesized sample by sample into a bank of AudioBuffers on the first tap,
+  // with several random variants per sound, so no two farts are the same and nothing is downloaded.
+  const SFX = (() => {
+    let ac = null, master = null, bank = null, muted = false;
+    try { muted = localStorage.getItem('shilshelet-mute') === '1'; } catch (e) {}
+
+    // RBJ biquad, coefficients can be swapped mid-buffer for sweeps
+    function coef(type, f, q, sr) {
+      const w = 2 * Math.PI * Math.min(f, sr * .45) / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * q);
+      let b0, b1, b2;
+      if (type === 'lp') { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = b0; }
+      else if (type === 'hp') { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = b0; }
+      else { b0 = al; b1 = 0; b2 = -al; }
+      const a0 = 1 + al;
+      return [b0 / a0, b1 / a0, b2 / a0, -2 * cs / a0, (1 - al) / a0];
+    }
+    function filt(type, f, q, sr) {
+      let x1 = 0, x2 = 0, y1 = 0, y2 = 0, c = coef(type, f, q, sr);
+      const run = x => { const y = c[0] * x + c[1] * x1 + c[2] * x2 - c[3] * y1 - c[4] * y2; x2 = x1; x1 = x; y2 = y1; y1 = y; return y; };
+      run.set = (nf, nq = q) => { c = coef(type, nf, nq, sr); };
+      return run;
+    }
+    const noise = () => Math.random() * 2 - 1;
+    function finish(d, peak = .9) {
+      let m = 0; for (let i = 0; i < d.length; i++) m = Math.max(m, Math.abs(d[i]));
+      const k = m ? peak / m : 0; for (let i = 0; i < d.length; i++) d[i] *= k;
+      const fade = Math.min(d.length, 220); for (let i = 0; i < fade; i++) d[d.length - 1 - i] *= i / fade;
+      return d;
+    }
+    function mix(dst, src, at, gain = 1) { for (let i = 0; i < src.length && at + i < dst.length; i++) dst[at + i] += src[i] * gain; }
+
+    // Sphincter model: an irregular pulse train (the flap) through two resonances (the cheeks),
+    // plus turbulent noise that is gated by the flap, plus wet bubbles.
+    function fart(sr, o) {
+      const n = Math.floor(sr * o.dur), d = new Float32Array(n);
+      const r1 = filt('bp', o.F1, o.Q1 || 5, sr), r2 = filt('bp', o.F2, o.Q2 || 4, sr), lp = filt('lp', o.bright || 1800, .7, sr);
+      const nf = filt('bp', o.nf || 500, 1.1, sr), hp = filt('hp', 45, .7, sr);
+      let ph = 0, per = 1, amp = 1, drift = 0, gate = 1, gateT = 0;
+      for (let i = 0; i < n; i++) {
+        const t = i / n, s = i / sr;
+        drift += (noise() * .02 - drift * .002);
+        const f = Math.max(18, (o.f0 + (o.f1 - o.f0) * Math.pow(t, o.curve || 1)) * (1 + drift * o.jit * 3) + Math.sin(s * 2 * Math.PI * (o.wob || 0)) * (o.wobAmt || 0));
+        ph += f / sr * per;
+        let ex = 0;
+        if (ph >= 1) { ph -= 1; per = 1 + noise() * o.jit; amp = .55 + Math.random() * .45; ex = amp; }
+        const open = ph < (o.open || .35) ? 1 : .15;
+        // sputter: random closures of the valve
+        if (o.sputter && --gateT <= 0) { gate = Math.random() < o.sputter ? 0 : 1; gateT = Math.floor(sr * (.015 + Math.random() * .05)); }
+        let env = Math.min(1, s / .012) * (t > .7 ? Math.pow((1 - t) / .3, 1.6) : 1);
+        env *= .75 + .25 * Math.sin(s * 2 * Math.PI * 9 + o.seed);
+        let v = r1(ex) * (o.g1 || 1) + r2(ex) * (o.g2 || .6) + Math.sin(ph * 2 * Math.PI) * .08;
+        v += nf(noise()) * (o.wet || .1) * open;
+        d[i] = hp(lp(v)) * env * (o.sputter ? (gate ? 1 : .08) : 1);
+      }
+      if (o.bubbles) for (let b = 0; b < o.bubbles; b++) mix(d, bubble(sr, rnd(160, 520), rnd(.02, .05)), Math.floor(rnd(.1, .9) * n), .5);
+      return finish(d);
+    }
+
+    function bubble(sr, f, len) {
+      const n = Math.floor(sr * len), d = new Float32Array(n); let ph = 0;
+      for (let i = 0; i < n; i++) { const t = i / n; ph += f * (1 + 2.2 * t) / sr; d[i] = Math.sin(ph * 2 * Math.PI) * Math.pow(1 - t, 2) * Math.min(1, i / 30); }
+      return d;
+    }
+
+    function machineGun(sr) {
+      const shots = 4 + (Math.random() * 5 | 0), parts = [];
+      let len = 0;
+      for (let k = 0; k < shots; k++) {
+        const p = fart(sr, { dur: rnd(.05, .11), f0: rnd(80, 130), f1: rnd(60, 90), jit: .2, F1: rnd(200, 300), F2: rnd(600, 900), wet: .25, seed: k });
+        const gap = Math.floor(sr * rnd(.02, .06));
+        parts.push([p, len]); len += p.length + gap;
+      }
+      const d = new Float32Array(len + 100);
+      parts.forEach(([p, at], k) => mix(d, p, at, k === parts.length - 1 ? 1.2 : .7 + Math.random() * .3));
+      return finish(d);
+    }
+
+    function pfft(sr, dur) { // silent but deadly: pure hiss
+      const n = Math.floor(sr * dur), d = new Float32Array(n), bp = filt('bp', 1600, 1.4, sr);
+      for (let i = 0; i < n; i++) { const t = i / n; if (i % 64 === 0) bp.set(1600 - 900 * t, 1.4); d[i] = bp(noise()) * Math.sin(Math.PI * Math.pow(t, .6)) * (.8 + .2 * Math.sin(i / sr * 70)); }
+      return finish(d, .5);
+    }
+
+    // Impact: a falling lowpass on noise (the slap), a sub thump (the mass), then droplets.
+    function splat(sr, o) {
+      const n = Math.floor(sr * o.dur), d = new Float32Array(n), lp = filt('lp', o.hi, .9, sr), sq = filt('bp', 900, 2, sr);
+      let ph = 0;
+      for (let i = 0; i < n; i++) {
+        const s = i / sr;
+        if (i % 32 === 0) lp.set(o.lo + (o.hi - o.lo) * Math.exp(-s / .05));
+        const slap = lp(noise()) * Math.exp(-s / o.tau);
+        ph += (35 + 70 * Math.exp(-s / .04)) / sr;
+        const thump = Math.sin(ph * 2 * Math.PI) * Math.exp(-s / .09) * o.thump;
+        const squish = o.squish ? sq(noise()) * Math.exp(-s / .12) * (.5 + .5 * Math.sin(s * 2 * Math.PI * 38)) * o.squish : 0;
+        d[i] = slap + thump + squish;
+      }
+      for (let k = 0; k < o.drops; k++) mix(d, bubble(sr, rnd(500, 1100), rnd(.015, .03)), Math.floor(sr * rnd(.07, o.dur - .05)), rnd(.15, .35));
+      return finish(d);
+    }
+
+    // Constipation: a voiced strain ("hnnnggh") from a glottal pulse train through vowel formants,
+    // pitch creeping up, trembling with effort.
+    function strain(sr, o) {
+      const n = Math.floor(sr * o.dur), d = new Float32Array(n);
+      const fs = o.formants.map(([f, q]) => filt('bp', f, q, sr)), br = filt('bp', 2500, 1, sr);
+      let ph = 0;
+      for (let i = 0; i < n; i++) {
+        const t = i / n, s = i / sr;
+        const f = (o.p0 + (o.p1 - o.p0) * t) * (1 + .015 * noise() + .03 * Math.sin(s * 2 * Math.PI * 6.5));
+        ph = (ph + f / sr) % 1;
+        const g = ph < .6 ? .5 * (1 - Math.cos(Math.PI * ph / .6)) : Math.cos(Math.PI * (ph - .6) / .8);
+        let v = 0; fs.forEach((r, k) => { v += r(g) * o.formants[k][2]; });
+        v += br(noise()) * .05;
+        const shake = .7 + .3 * Math.sin(s * 2 * Math.PI * 8 + Math.sin(s * 13));
+        const env = Math.min(1, s / .12) * shake * (t > .85 ? (1 - t) / .15 : 1);
+        d[i] = v * env;
+      }
+      return finish(d, .8);
+    }
+
+    function gurgle(sr) {
+      const dur = rnd(.6, 1), n = Math.floor(sr * dur), d = new Float32Array(n), lp = filt('lp', 140, .8, sr);
+      for (let i = 0; i < n; i++) d[i] = lp(noise()) * .9 * Math.sin(Math.PI * i / n);
+      const k = 6 + (Math.random() * 8 | 0);
+      for (let b = 0; b < k; b++) mix(d, bubble(sr, rnd(110, 380), rnd(.03, .07)), Math.floor(rnd(0, .85) * n), rnd(.3, .7));
+      const out = filt('lp', 900, .7, sr); for (let i = 0; i < n; i++) d[i] = out(d[i]);
+      return finish(d, .6);
+    }
+
+    function thwap(sr) { // poop bouncing off the immunity umbrella
+      const n = Math.floor(sr * .45), d = new Float32Array(n), bp = filt('bp', 1200, 1.5, sr);
+      let ph = 0;
+      for (let i = 0; i < n; i++) {
+        const s = i / sr;
+        ph += (170 + 25 * Math.sin(s * 2 * Math.PI * 14) * Math.exp(-s / .2)) / sr;
+        d[i] = bp(noise()) * Math.exp(-s / .025) + Math.sin(ph * 2 * Math.PI) * .5 * Math.exp(-s / .15);
+      }
+      return finish(d, .7);
+    }
+
+    function sadTrombone(sr) { // "wah wah wah waaah" for hitting a voter
+      const notes = [[293, .26], [277, .26], [261, .26], [247, .9]], total = notes.reduce((a, [, l]) => a + l, 0);
+      const n = Math.floor(sr * total), d = new Float32Array(n), lp = filt('lp', 900, 1.2, sr);
+      let i = 0, ph = 0;
+      notes.forEach(([f, l], k) => {
+        const m = Math.floor(sr * l);
+        for (let j = 0; j < m && i < n; j++, i++) {
+          const s = j / sr, vib = k === 3 ? 1 + .03 * Math.sin(s * 2 * Math.PI * 5.5) : 1;
+          ph = (ph + f * vib / sr) % 1;
+          lp.set(400 + 1400 * Math.min(1, s / .06) * (1 - j / m * .6));
+          const env = Math.min(1, s / .02) * (j > m - sr * .04 ? (m - j) / (sr * .04) : 1);
+          d[i] = lp(2 * ph - 1) * env;
+        }
+      });
+      return finish(d, .55);
+    }
+
+    function flush(sr) {
+      const dur = 1.6, n = Math.floor(sr * dur), d = new Float32Array(n), bp = filt('bp', 600, .8, sr), lp = filt('lp', 300, .7, sr);
+      for (let i = 0; i < n; i++) {
+        const t = i / n, s = i / sr;
+        if (i % 64 === 0) bp.set(500 + 900 * Math.sin(Math.PI * t) + 200 * Math.sin(s * 2 * Math.PI * 3));
+        const swirl = .6 + .4 * Math.sin(s * 2 * Math.PI * (4 + 6 * t));
+        d[i] = (bp(noise()) * swirl + lp(noise()) * .8) * Math.min(1, s / .08) * Math.pow(1 - t, 1.3);
+      }
+      for (let b = 0; b < 10; b++) mix(d, bubble(sr, rnd(250, 700), rnd(.02, .05)), Math.floor(rnd(.3, .9) * n), .25);
+      return finish(d, .55);
+    }
+
+    function build(sr) {
+      const B = {};
+      const many = (k, fn) => Array.from({ length: k }, (_, i) => fn(i));
+      B.classic = () => many(4, i => fart(sr, { dur: rnd(.35, .6), f0: rnd(85, 120), f1: rnd(55, 70), jit: .12, F1: rnd(200, 260), F2: rnd(550, 750), wet: .12, wob: rnd(4, 8), wobAmt: 8, seed: i }));
+      B.wet = () => many(4, i => fart(sr, { dur: rnd(.45, .7), f0: rnd(55, 75), f1: rnd(38, 50), jit: .35, F1: 180, F2: 480, nf: 380, wet: .9, sputter: .3, bubbles: 6, bright: 1100, seed: i }));
+      B.squeak = () => many(3, i => { const up = Math.random() < .5; return fart(sr, { dur: rnd(.3, .5), f0: up ? rnd(220, 260) : rnd(330, 380), f1: up ? rnd(330, 400) : rnd(180, 220), jit: .04, F1: rnd(480, 560), F2: rnd(1300, 1600), Q1: 7, Q2: 6, wet: .04, bright: 3200, seed: i }); });
+      B.trumpet = () => many(3, i => fart(sr, { dur: rnd(.9, 1.3), f0: rnd(110, 140), f1: rnd(50, 60), curve: .7, jit: .1, F1: rnd(260, 320), F2: rnd(800, 1000), wet: .15, wob: rnd(3, 5), wobAmt: 18, bright: 2400, seed: i }));
+      B.gun = () => many(3, () => machineGun(sr));
+      B.pfft = () => many(2, () => pfft(sr, rnd(.4, .7)));
+      B.splatHead = () => many(3, () => splat(sr, { dur: .5, hi: 4200, lo: 350, tau: .07, thump: 1.1, squish: .7, drops: 5 }));
+      B.splatBody = () => many(3, () => splat(sr, { dur: .4, hi: 3200, lo: 300, tau: .06, thump: .8, squish: .4, drops: 3 }));
+      B.splatGround = () => many(3, () => splat(sr, { dur: .35, hi: 1800, lo: 200, tau: .05, thump: .6, squish: 0, drops: 2 }));
+      B.strain = () => [
+        strain(sr, { dur: .8, p0: 105, p1: 150, formants: [[260, 6, 1], [1900, 10, .25], [2600, 12, .1]] }),   // hnnnng
+        strain(sr, { dur: .7, p0: 120, p1: 170, formants: [[620, 6, 1], [1050, 8, .6], [2500, 12, .15]] }),   // uggghh
+        strain(sr, { dur: .9, p0: 95, p1: 140, formants: [[400, 6, 1], [800, 8, .5], [2400, 12, .1]] }),      // ohhhnn
+      ];
+      B.squeakFail = () => many(2, i => fart(sr, { dur: rnd(.12, .18), f0: rnd(380, 450), f1: rnd(300, 340), jit: .03, F1: 600, F2: 1700, Q1: 8, Q2: 8, wet: .02, bright: 3500, seed: i }));
+      B.gurgle = () => many(3, () => gurgle(sr));
+      B.blub = () => many(2, () => { const d = new Float32Array(Math.floor(sr * .25)); mix(d, bubble(sr, rnd(180, 240), .12), 0, 1); mix(d, bubble(sr, rnd(380, 460), .08), Math.floor(sr * .1), .7); return finish(d, .5); });
+      B.thwap = () => many(2, () => thwap(sr));
+      B.rip = () => many(2, () => { const n = Math.floor(sr * .16), d = new Float32Array(n), hp = filt('hp', 2500, .7, sr); for (let i = 0; i < n; i++) d[i] = hp(noise()) * (Math.random() < .18 ? 1 : .15) * (1 - i / n); return finish(d, .45); });
+      B.trombone = () => [sadTrombone(sr)];
+      B.flush = () => [flush(sr)];
+      return B;
+    }
+
+    // Synthesize the raw samples in small slices right after load, so the first tap never waits;
+    // AudioBuffers are made per family on first use, once the tap has created the AudioContext.
+    const SR = 44100, RAW = {}, todo = Object.entries(build(SR));
+    (function pump() {
+      const t0 = performance.now();
+      while (todo.length && performance.now() - t0 < 12) { const [k, fn] = todo.shift(); RAW[k] = fn(); }
+      if (todo.length) setTimeout(pump, 0);
+    })();
+    if (location.hash === '#debug') window.__raw = RAW; // playtest hook
+    function buffers(name) {
+      if (!bank[name] && RAW[name]) bank[name] = RAW[name].map(d => { const b = ac.createBuffer(1, d.length, SR); b.getChannelData(0).set(d); return b; });
+      return bank[name];
+    }
+
+    function init() {
+      try {
+        if (!ac) {
+          ac = new (window.AudioContext || window.webkitAudioContext)();
+          const comp = ac.createDynamicsCompressor();
+          comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .15;
+          master = ac.createGain(); master.gain.value = muted ? 0 : .9;
+          master.connect(comp); comp.connect(ac.destination);
+          bank = {};
+        }
+        if (ac.state === 'suspended') ac.resume();
+      } catch (e) { ac = null; }
+    }
+
+    // name: sound family; x: game x for stereo placement
+    function play(name, { vol = 1, rate = 1, x = null, delay = 0 } = {}) {
+      if (!ac || muted) return;
+      const list = buffers(name); if (!list) return;
+      const src = ac.createBufferSource(); src.buffer = pick(list);
+      src.playbackRate.value = rate * rnd(.93, 1.07);
+      const g = ac.createGain(); g.gain.value = vol;
+      let node = src.connect(g);
+      if (x != null && ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, (x / W * 2 - 1) * .7)); node = node.connect(p); }
+      node.connect(master);
+      src.start(ac.currentTime + delay);
+    }
+
+    function setMuted(m) {
+      muted = m;
+      try { localStorage.setItem('shilshelet-mute', m ? '1' : '0'); } catch (e) {}
+      if (master) master.gain.setTargetAtTime(m ? 0 : .9, ac.currentTime, .02);
+    }
+
+    return { init, play, setMuted, get muted() { return muted; } };
+  })();
+
+  // Pick the drop sound by how the game is going: a hot streak earns the dramatic ones.
+  function fartFor(combo, gut) {
+    const r = Math.random();
+    if (gut < 30) return r < .5 ? 'squeak' : 'pfft';
+    if (combo >= 6) return r < .45 ? 'trumpet' : r < .8 ? 'gun' : 'wet';
+    if (r < .38) return 'classic';
+    if (r < .62) return 'wet';
+    if (r < .76) return 'squeak';
+    if (r < .86) return 'gun';
+    if (r < .95) return 'trumpet';
+    return 'pfft';
   }
 
   // ---------- canvas sizing ----------
@@ -430,68 +673,134 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
 
   function drawHUD() {
     ctx.save(); ctx.direction = 'rtl';
+    // party strip: one segment per party, right to left in wave order, filling brown as members get pooped
+    let sx = W - 14; const sw = W - 28;
+    WAVES.forEach((pi, wi) => {
+      const p = PARTIES[pi], w = sw * p.seats / TOTAL, h = S.members.filter(m => m.party === pi && m.hit).length;
+      ctx.fillStyle = p.color; ctx.fillRect(sx - w + 1, 6, w - 2, 9);
+      ctx.fillStyle = '#5e3714'; ctx.fillRect(sx - w * h / p.seats + 1, 6, w * h / p.seats - 2, 9);
+      if (wi === S.wave) { ctx.strokeStyle = '#f4ecd8'; ctx.lineWidth = 2; ctx.strokeRect(sx - w + 1, 5, w - 2, 11); }
+      sx -= w;
+    });
     ctx.fillStyle = '#f4ecd8'; ctx.textAlign = 'right';
-    ctx.font = '700 34px Karantina, Assistant, sans-serif'; ctx.fillText(`ניקוד ${S.score}`, W - 14, 38);
+    ctx.font = '700 34px Karantina, Assistant, sans-serif'; ctx.fillText(`ניקוד ${S.score}`, W - 14, 50);
     ctx.font = '600 15px Assistant, sans-serif';
-    const left = TOTAL - S.spawned + S.people.filter(p => p.kind === 'mk').length;
-    ctx.fillText(`ח״כים שעוד בדרך לקלפי: ${left}/${TOTAL}`, W - 14, 60);
-    ctx.fillText(`פגעת ב־${S.hits}`, W - 14, 80);
+    ctx.fillText(`מלושלשים ${S.hits}/${TOTAL} · ${clock(S.t)}`, W - 14, 72);
+    if (S.wave >= 0) { const p = PARTIES[WAVES[S.wave]]; ctx.fillStyle = p.color; ctx.fillText(`גל ${S.wave + 1}/8 · ${p.name}`, W - 14, 92); }
     // gut meter
-    ctx.textAlign = 'left'; ctx.fillText('מעיים', 14, 30);
-    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(14, 38, 120, 12);
-    ctx.fillStyle = S.gut >= 20 ? '#a8692f' : '#e2574c'; ctx.fillRect(14, 38, 120 * S.gut / 100, 12);
-    ctx.strokeStyle = '#f4ecd8'; ctx.lineWidth = 1; ctx.strokeRect(14.5, 38.5, 119, 11);
+    ctx.fillStyle = '#f4ecd8'; ctx.textAlign = 'left'; ctx.fillText(S.gut < 20 ? 'מעיים · עצירות!' : 'מעיים', 14, 36);
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(14, 42, 120, 12);
+    ctx.fillStyle = S.gut >= 20 ? '#a8692f' : '#e2574c'; ctx.fillRect(14, 42, 120 * S.gut / 100, 12);
+    ctx.strokeStyle = '#f4ecd8'; ctx.lineWidth = 1; ctx.strokeRect(14.5, 42.5, 119, 11);
     const m = mult();
-    if (S.combo > 1) { ctx.fillStyle = '#f2c230'; ctx.font = '700 26px Karantina, Assistant, sans-serif'; ctx.fillText(`רצף ${S.combo} · x${m}`, 14, 76); }
+    if (S.combo > 1) { ctx.fillStyle = '#f2c230'; ctx.font = '700 26px Karantina, Assistant, sans-serif'; ctx.fillText(`רצף ${S.combo} · x${m}`, 14, 80); }
+    // wave banner
+    if (S.banner && S.banner.t > 0) {
+      const B = S.banner, a = Math.min(1, B.t * 2, (B.dur - B.t) * 4);
+      ctx.globalAlpha = a; ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(10,18,24,.85)'; ctx.fillRect(0, 262, W, 112);
+      ctx.fillStyle = B.color; ctx.fillRect(0, 262, W, 6); ctx.fillRect(0, 368, W, 6);
+      ctx.fillStyle = '#f2c230'; ctx.font = '700 30px Karantina, Assistant, sans-serif'; ctx.fillText(B.kicker, W / 2, 302);
+      ctx.fillStyle = '#f4ecd8'; ctx.font = '700 40px Karantina, Assistant, sans-serif'; ctx.fillText(B.title, W / 2, 342);
+      ctx.fillStyle = '#9fb3bf'; ctx.font = '600 14px Assistant, sans-serif'; ctx.fillText(B.sub, W / 2, 362);
+    }
+    ctx.restore();
+  }
+
+  const clock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+
+  function drawEnvelope(x, y, rot, alpha = 1, open = false) {
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(rot);
+    ctx.fillStyle = '#cfe0ee'; ctx.fillRect(-14, -9, 28, 19);
+    ctx.strokeStyle = '#4f7596'; ctx.lineWidth = 1.2; ctx.strokeRect(-14, -9, 28, 19);
+    ctx.beginPath();
+    if (open) { ctx.moveTo(-14, -9); ctx.lineTo(0, -22); ctx.lineTo(14, -9); ctx.closePath(); ctx.fillStyle = '#b7cfe3'; ctx.fill(); ctx.stroke(); }
+    else { ctx.moveTo(-14, -9); ctx.lineTo(0, 2); ctx.lineTo(14, -9); ctx.stroke(); }
+    ctx.fillStyle = '#2b5fb0'; ctx.fillRect(-10, 4, 20, 3);
     ctx.restore();
   }
 
   // ---------- game logic ----------
   const mult = () => Math.min(5, 1 + Math.floor(S.combo / 3));
-  const progress = () => S.spawned / TOTAL;
+  // Waves go from the smallest party to the largest
+  const WAVES = PARTIES.map((p, i) => i).sort((a, b) => PARTIES[a].seats - PARTIES[b].seats);
+
+  function startWave(i) {
+    S.wave = i;
+    const pi = WAVES[i], p = PARTIES[pi];
+    S.waveQueue = shuffle(S.members.filter(m => m.party === pi));
+    S.banner = { kicker: `גל ${i + 1} מתוך 8`, title: p.name, sub: `${p.seats} ח״כים · מי שבורח חוזר`, color: p.color, t: 2.4, dur: 2.4 };
+    S.nextSpawn = 2.2;
+  }
 
   function spawnOne(kind) {
     const dir = Math.random() < .5 ? 1 : -1;
     const p = { kind, dir, x: dir > 0 ? -30 : W + 30, phase: Math.random() * 6, look: makeLook(kind), hit: null, bubble: '', bubbleT: 0 };
     if (kind === 'mk') {
-      p.member = S.queue[S.spawned++];
-      p.speed = rnd(45, 75) + progress() * 55;
-      p.umbrella = Math.random() < .05 + progress() * .15;
+      p.member = S.waveQueue.shift();
+      p.look = p.member.look || (p.member.look = makeLook('mk'));
+      p.speed = rnd(45, 72) + Math.max(0, S.wave) * 7 + (p.member.returns || 0) * 5;
+      p.umbrella = Math.random() < .04 + Math.max(0, S.wave) * .025;
     } else { p.speed = rnd(35, 60); }
     S.people.push(p);
+    return p;
   }
 
   function spawnTick(dt) {
     S.nextSpawn -= dt;
-    if (S.nextSpawn > 0 || S.spawned >= TOTAL) return;
-    const pr = progress();
+    if (S.nextSpawn > 0 || !S.waveQueue.length) return;
+    const onScreen = S.people.filter(p => p.kind === 'mk' && !p.hit).length;
+    if (onScreen >= 3 + Math.floor(S.wave / 2)) { S.nextSpawn = .3; return; }
     if (Math.random() < .14) spawnOne('cit');
     else {
       spawnOne('mk');
-      if (pr > .25 && Math.random() < .25 && S.spawned < TOTAL) { spawnOne('mk'); S.people[S.people.length - 1].x += -S.people[S.people.length - 1].dir * 40; }
+      if (S.wave >= 2 && Math.random() < .25 && S.waveQueue.length) { const q = spawnOne('mk'); q.dir = S.people[S.people.length - 2].dir; q.x = q.dir > 0 ? -70 : W + 70; }
     }
-    S.nextSpawn = rnd(.8, 1.3) * (1.5 - pr * .9);
+    S.nextSpawn = rnd(.7, 1.2) * (1.4 - S.wave * .08);
+  }
+
+  function checkWave() {
+    if (S.wave < 0 || S.finishing) return;
+    const pi = WAVES[S.wave];
+    if (S.members.some(m => m.party === pi && !m.hit)) return;
+    const bonus = 10 * (S.wave + 1);
+    S.score += bonus;
+    addText(W / 2, 250, `${PARTIES[pi].name} מלושלשת! +${bonus}`, '#f2c230', 28);
+    SFX.play('flush', { vol: .5 });
+    if (S.wave < WAVES.length - 1) startWave(S.wave + 1);
+    else S.finishing = 1.6;
   }
 
   function drop() {
     if (!S.running) return;
-    if (S.gut < 20) { addText(S.px, ROOF + 44, 'המעיים ריקים...', '#e2574c'); return; }
-    S.gut -= 20; S.squat = 1;
-    S.blobs.push({ x: S.px, y: ROOF + 6, vx: S.pvx * .35, vy: 30, rot: 0 });
-    fart();
+    if (S.gut < 20) {
+      if (S.t - S.lastStrain > .9) {
+        S.lastStrain = S.t; S.squat = 1;
+        addText(S.px, ROOF + 44, 'עצירות!', '#e2574c');
+        SFX.play('strain', { x: S.px, vol: .9 });
+        SFX.play('squeakFail', { x: S.px, vol: .6, delay: .6 });
+      }
+      return;
+    }
+    const kind = fartFor(S.combo, S.gut);
+    S.gut -= 20; S.squat = 1; S.drops++;
+    S.blobs.push({ x: S.px, y: ROOF + 6, y0: ROOF + 6, vx: S.pvx * .35, vy: 30, rot: rnd(-.3, .3), open: false, age: 0 });
+    SFX.play(kind, { x: S.px, vol: kind === 'pfft' ? 1 : .75 });
+    if (S.gut < 20) { S.loading = true; SFX.play('strain', { x: S.px, vol: .5, delay: .4 }); }
   }
 
   function addText(x, y, text, color = '#f2c230', size = 26) { S.texts.push({ x, y, text, color, size, t: 1.1 }); }
   function burst(x, y, n = 10) { for (let i = 0; i < n; i++) S.parts.push({ x, y, vx: rnd(-120, 120), vy: rnd(-220, -40), t: rnd(.4, .8) }); }
 
-  function land(b, onGround) {
-    burst(b.x, b.y, onGround ? 8 : 12);
-    splatSnd(.45, onGround ? 600 : 900);
+  function land(b, sound) {
+    burst(b.x, b.y, sound === 'splatGround' ? 8 : 12);
+    SFX.play(sound, { x: b.x, vol: sound === 'splatHead' ? 1 : .85 });
   }
 
   function hitPerson(b, p, zone) {
-    land(b, false);
+    land(b, zone === 'head' ? 'splatHead' : 'splatBody');
     if (p.kind === 'cit') {
+      SFX.play('trombone', { vol: .7, delay: .15 });
       S.score -= 3; S.combo = 0; S.citizens++;
       addText(p.x, GROUND - 120, 'זה בוחר! −3', '#e2574c');
       p.hit = p.hit || zone; p.bubble = pick(CIT_QUOTES); p.bubbleT = 1.6; p.speed *= 1.6;
@@ -503,6 +812,7 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     S.best = Math.max(S.best, S.combo);
     p.hit = zone; p.member.hit = zone; p.bubble = pick(QUOTES); p.bubbleT = 1.8; p.speed *= 1.7;
     addText(p.x, GROUND - 120, zone === 'head' ? `בול! +${pts}` : `+${pts}`);
+    checkWave();
   }
 
   function update(dt) {
@@ -516,6 +826,9 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     S.px = Math.max(24, Math.min(W - 24, S.px + S.pvx * dt));
     S.squat = Math.max(0, S.squat - dt * 4);
     S.gut = Math.min(100, S.gut + dt * 24);
+    if (S.loading && S.gut >= 20) { S.loading = false; SFX.play('blub', { x: S.px, vol: .7 }); }
+    if ((S.nextGurgle -= dt) <= 0) { S.nextGurgle = rnd(5, 9); SFX.play('gurgle', { vol: .35 }); }
+    if (S.banner) S.banner.t -= dt;
     S.shake = Math.max(0, S.shake - dt);
 
     spawnTick(dt);
@@ -524,26 +837,46 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
       p.x += p.dir * p.speed * dt; p.phase += dt * p.speed * .11;
       if (p.bubbleT > 0) p.bubbleT -= dt;
     }
-    S.people = S.people.filter(p => p.x > -60 && p.x < W + 60);
+    S.people = S.people.filter(p => {
+      if (p.x > -60 && p.x < W + 60) return true;
+      if (p.kind === 'mk' && !p.hit) {
+        p.member.returns = (p.member.returns || 0) + 1;
+        S.waveQueue.push(p.member);
+        addText(p.x < 0 ? 70 : W - 70, GROUND - 150, 'ברח! יחזור', '#9fb3bf', 20);
+      }
+      return false;
+    });
 
     for (const b of S.blobs) {
-      b.vy += G * dt; b.y += b.vy * dt; b.x += b.vx * dt; b.rot += dt * 3;
+      b.vy += G * dt; b.y += b.vy * dt; b.x += b.vx * dt; b.rot += dt * (b.open ? 3 : 7);
+      // the ballot envelope you cast opens mid-air and shows what it really was
+      if (!b.open && b.y - b.y0 > 115) {
+        b.open = true; b.age = 0;
+        S.papers.push({ x: b.x, y: b.y, vx: b.vx + rnd(-70, 70), vy: -60, rot: b.rot, vr: rnd(-5, 5), t: 1.6 });
+        for (let i = 0; i < 6; i++) S.parts.push({ x: b.x, y: b.y, vx: rnd(-80, 80), vy: rnd(-120, 0), t: rnd(.2, .4) });
+        SFX.play('rip', { x: b.x, vol: .5 });
+      }
+      b.age += dt;
       for (const p of S.people) {
         const dx = b.x - p.x;
         if (p.umbrella && Math.abs(dx - p.dir * 4) < 32 && b.y > GROUND - 134 && b.y < GROUND - 98) {
-          b.dead = true; burst(b.x, b.y, 6); splatSnd(.3, 1400);
-          addText(p.x, GROUND - 150, 'חסינות!', '#9fb3bf', 22); break;
+          b.dead = true; burst(b.x, b.y, 6); SFX.play('thwap', { x: b.x });
+          p.umbrella = false;
+          S.papers.push({ x: p.x, y: GROUND - 110, vx: p.dir * 140, vy: -260, rot: 0, vr: 8, t: 1.4, umbrella: true });
+          addText(p.x, GROUND - 150, 'החסינות הוסרה!', '#9fb3bf', 22); break;
         }
         const hy = GROUND - 74;
         if (Math.hypot(dx, b.y - hy) < 20) { b.dead = true; hitPerson(b, p, 'head'); break; }
         if (Math.abs(dx) < 16 && b.y > GROUND - 60 && b.y < GROUND - 4) { b.dead = true; hitPerson(b, p, 'body'); break; }
       }
       if (!b.dead && b.y >= GROUND + 8) {
-        b.dead = true; land(b, true); S.combo = 0;
+        b.dead = true; land(b, 'splatGround'); S.combo = 0;
         S.splats.push({ x: b.x, y: GROUND + rnd(4, 18), t: 8, r: rnd(.8, 1.2) });
       }
     }
     S.blobs = S.blobs.filter(b => !b.dead);
+    for (const q of S.papers) { q.vy += (q.umbrella ? G : 160) * dt; q.vx *= .98; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.t -= dt; }
+    S.papers = S.papers.filter(q => q.t > 0);
     for (const q of S.parts) { q.vy += G * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.t -= dt; }
     S.parts = S.parts.filter(q => q.t > 0);
     for (const s of S.splats) s.t -= dt;
@@ -551,7 +884,7 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     for (const tx of S.texts) { tx.t -= dt; tx.y -= dt * 40; }
     S.texts = S.texts.filter(tx => tx.t > 0);
 
-    if (S.spawned >= TOTAL && !S.people.some(p => p.kind === 'mk') && S.blobs.length === 0) endGame();
+    if (S.finishing && (S.finishing -= dt) <= 0) endGame();
   }
 
   function render() {
@@ -566,7 +899,14 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     const ppl = S.people.slice().sort((a, b) => (a.kind === 'cit') - (b.kind === 'cit'));
     ppl.forEach(drawPerson);
     drawPlayer();
-    for (const b of S.blobs) drawPoop(b.x, b.y, 1, Math.sin(b.rot) * .3);
+    for (const q of S.papers) {
+      if (q.umbrella) { ctx.save(); ctx.globalAlpha = Math.min(1, q.t); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillStyle = '#16161b'; ctx.beginPath(); ctx.arc(0, 0, 26, Math.PI, 0); ctx.fill(); ctx.restore(); }
+      else drawEnvelope(q.x, q.y, q.rot, Math.min(1, q.t), true);
+    }
+    for (const b of S.blobs) {
+      if (!b.open) drawEnvelope(b.x, b.y, b.rot);
+      else drawPoop(b.x, b.y, Math.min(1, .35 + b.age * 6), Math.sin(b.rot) * .3);
+    }
     ctx.fillStyle = '#6b3d16';
     for (const q of S.parts) circ(q.x, q.y, 2.6);
     ctx.save(); ctx.textAlign = 'center'; ctx.direction = 'rtl';
@@ -593,28 +933,30 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   function showBest() { const b = bestScore(); $('bestLine').textContent = b ? `השיא שלך: ${b} נקודות` : ''; }
 
   function start() {
-    audio();
+    SFX.init();
     S = newState(); S.running = true;
+    startWave(0);
+    SFX.play('flush', { vol: .6 });
     $('startScreen').hidden = true; $('endScreen').hidden = true;
     cvs.focus?.();
   }
 
   const VERDICTS = [
-    [0, 'שלשול קל. לא עברת את אחוז החסימה'],
-    [.1, 'עברת את אחוז החסימה, בקושי'],
-    [.3, 'שר בכיר במשרד הביוב'],
-    [.5, 'יו״ר ועדת הכספים. והכפפות'],
-    [.75, 'ראש ממשלת השלשולים'],
-    [.95, 'רוב מוחלט. הכנסת מפוזרת'],
+    [0, 'שפריצת לכל הכיוונים. בזבוז כספי ציבור'],
+    [.3, 'עברת את אחוז החסימה, בקושי'],
+    [.42, 'שר בכיר במשרד הביוב'],
+    [.55, 'יו״ר ועדת הכספים. והכפפות'],
+    [.7, 'ראש ממשלת השלשולים'],
+    [.85, 'צלף הקלפי. אף מעטפה לא הלכה לפח'],
   ];
 
   function endGame() {
     S.running = false; S.over = true;
-    const ratio = S.hits / TOTAL;
-    let v = VERDICTS[0][1]; for (const [th, txt] of VERDICTS) if (ratio >= th) v = txt;
+    const acc = S.drops ? S.hits / S.drops : 0;
+    let v = VERDICTS[0][1]; for (const [th, txt] of VERDICTS) if (acc >= th) v = txt;
     $('verdict').textContent = v;
-    $('bigCount').innerHTML = `${S.hits}<span> / 120 ח״כים</span>`;
-    const parts = [`${S.score} נקודות`, `${S.heads} בול בראש`, `רצף שיא ${S.best}`];
+    $('bigCount').innerHTML = `${clock(S.t)}<span> דקות לכל 120</span>`;
+    const parts = [`${S.score} נקודות`, `${S.drops} מעטפות, ${Math.round(acc * 100)}% פגיעה`, `${S.heads} בול בראש`, `רצף שיא ${S.best}`];
     if (S.citizens) parts.push(`${S.citizens} בוחרים תמימים נפגעו`);
     $('endLede').textContent = parts.join(' · ');
     drawHemicycle();
@@ -629,7 +971,8 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     $('toast').textContent = '';
     if (S.score > bestScore()) saveBest(S.score);
     $('endScreen').hidden = false;
-    $('againBtn').focus();
+    $('againBtn').focus({ preventScroll: true });
+    SFX.play('flush', { vol: .8 });
   }
 
   function drawHemicycle() {
@@ -645,13 +988,13 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     svg.innerHTML = seats.map((s, i) => {
       const m = ordered[i], c = PARTIES[m.party].color;
       return m.hit
-        ? `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5.4" fill="#7a4a1f" stroke="${c}" stroke-width="2"><title>ח״כ ${m.name}</title></circle>`
+        ? `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5.4" fill="#7a4a1f" stroke="${c}" stroke-width="2"><title>ח״כ ${m.name}</title></circle>${m.hit === 'head' ? `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="1.8" fill="#f2c230"/>` : ''}`
         : `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5.4" fill="${c}" opacity=".9"><title>ח״כ ${m.name}</title></circle>`;
-    }).join('') + `<text x="170" y="170" text-anchor="middle" fill="#f4ecd8" font-family="Karantina, Assistant, sans-serif" font-size="30" font-weight="700">${S.hits} 💩</text>`;
+    }).join('') + `<text x="170" y="170" text-anchor="middle" fill="#f4ecd8" font-family="Karantina, Assistant, sans-serif" font-size="30" font-weight="700">${clock(S.t)}</text>`;
   }
 
   async function share() {
-    const txt = `שלשלתי היום על ${S.hits} מתוך 120 חברי כנסת ב״שלשלת 2026״ 💩 ${S.score} נקודות, ${S.heads} בול בראש. ${$('verdict').textContent}.`;
+    const txt = `שלשלתי על כל 120 חברי הכנסת ב־${clock(S.t)} דקות ב״שלשלת 2026״ 💩 ${S.score} נקודות, ${S.heads} בול בראש. ${$('verdict').textContent}.`;
     try { await navigator.clipboard.writeText(txt); $('toast').textContent = 'התוצאה הועתקה. עכשיו להדביק בקבוצת הווטסאפ המשפחתית.'; }
     catch (e) { $('toast').textContent = txt; }
   }
@@ -688,17 +1031,22 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   cvs.addEventListener('pointerup', () => { if (drag && !drag.moved) drop(); drag = null; });
   cvs.addEventListener('pointercancel', () => { drag = null; });
 
+  const syncMute = () => { $('muteBtn').textContent = SFX.muted ? '🔇' : '🔊'; $('muteBtn').setAttribute('aria-pressed', SFX.muted); };
+  $('muteBtn').addEventListener('click', () => { SFX.init(); SFX.setMuted(!SFX.muted); syncMute(); });
+  window.addEventListener('keydown', e => { if (e.key === 'm' || e.key === 'M') { SFX.setMuted(!SFX.muted); syncMute(); } });
+  syncMute();
   $('startBtn').addEventListener('click', start);
   $('againBtn').addEventListener('click', start);
   $('shareBtn').addEventListener('click', share);
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
   window.addEventListener('resize', resize);
 
+  if (location.hash === '#debug') window.__shil = () => S; // playtest hook
   showBest();
   resize();
   // idle demo crowd behind the start screen
+  S.waveQueue = S.members.slice(0, 4);
   for (let i = 0; i < 4; i++) { spawnOne('mk'); S.people[i].x = 60 + i * 95; }
-  S.spawned = 0;
   requestAnimationFrame(frame);
   if (document.fonts) document.fonts.ready.then(resize);
 })();
