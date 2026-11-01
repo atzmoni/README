@@ -11,15 +11,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Karantina:wght@400;700&family=Assistant:wght@400;600;800&display=swap">
 <style>
-/* Layout: one-screen arcade cabinet. Portrait canvas centered, control deck below, HTML overlays for start/results. */
+/* Layout: a mid-90s PC game. Low-res pixel canvas scaled up in the middle, chunky bevelled
+   control deck below, VGA-style dialog boxes for the start and results screens. */
 :root {
-  --night: #13202a;      /* cabinet + sky */
-  --deck: #1c2d38;       /* control deck */
-  --mustard: #f2c230;    /* accent: headlines, primary button */
+  --night: #10101c;      /* monitor black */
+  --deck: #23233a;       /* control deck plastic */
+  --vga-blue: #1c1ca8;   /* dialog boxes */
+  --mustard: #fcd23c;    /* accent: headlines, primary button */
   --poop: #7a4a1f;       /* the ammunition */
-  --poop-hi: #a8692f;
+  --spit: #9fe08a;       /* the other ammunition */
   --paper: #f4ecd8;      /* text on dark */
-  --muted: #9fb3bf;
+  --muted: #a9b4d6;
   --bad: #e2574c;
   --display: "Karantina", "Arial Narrow", "Assistant", sans-serif;
   --body: "Assistant", "Arial Hebrew", "Segoe UI", sans-serif;
@@ -39,35 +41,42 @@ body {
   padding-right: max(0px, env(safe-area-inset-right, 0px));
 }
 #stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
-canvas#game { display: block; touch-action: none; border-radius: 6px; }
+canvas#game { display: block; touch-action: none; image-rendering: pixelated; box-shadow: 0 0 0 3px #000, 0 0 0 6px #3a3a5a; }
 #deck {
-  display: grid; grid-template-columns: .6fr 1fr 1.4fr 1fr; gap: 10px; direction: ltr;
+  display: grid; grid-template-columns: .55fr .9fr 1.1fr 1.1fr .9fr; gap: 8px; direction: ltr;
   padding-block: 10px 12px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  background: var(--deck); border-top: 2px solid #000;
+  background: var(--deck); border-top: 3px solid #000;
   max-width: 520px; width: 100%; margin: 0 auto; box-sizing: border-box;
 }
 .pad {
-  font-family: var(--display); font-size: 30px; line-height: 1;
-  border: 0; border-radius: 14px; padding: 12px 0; color: var(--paper);
-  background: #2c4352; box-shadow: 0 4px 0 #0b141a; cursor: pointer;
+  font-family: var(--display); font-size: 28px; line-height: 1; color: var(--paper);
+  border: 3px solid; border-color: #6a6a9a #12121f #12121f #6a6a9a;
+  border-radius: 0; padding: 10px 0 8px; background: #3a3a5c; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
-.pad:active, .pad.held { transform: translateY(3px); box-shadow: 0 1px 0 #0b141a; }
-.pad.mute { font-size: 22px; background: #22343f; }
-.pad.drop { background: var(--poop); box-shadow: 0 4px 0 #3b220c; font-size: 32px; }
-.pad:focus-visible, .btn:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+.pad small { font-family: var(--body); font-size: 11px; font-weight: 800; letter-spacing: .5px; }
+.pad:active, .pad.held { border-color: #12121f #6a6a9a #6a6a9a #12121f; background: #303050; }
+.pad.mute { font-size: 20px; justify-content: center; }
+.pad.spit { background: #2f6a3a; border-color: #6fbf72 #10260f #10260f #6fbf72; }
+.pad.drop { background: var(--poop); border-color: #c08a4a #3b220c #3b220c #c08a4a; }
+.pad.spit.held { border-color: #10260f #6fbf72 #6fbf72 #10260f; }
+.pad.drop.held { border-color: #3b220c #c08a4a #c08a4a #3b220c; }
+.pad:focus-visible, .btn:focus-visible, .slip:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
 
 .overlay {
   position: absolute; inset: 0; display: flex;
-  background: rgba(10, 18, 24, .82); overflow-y: auto;
+  background: rgba(8, 8, 20, .78); overflow-y: auto;
   padding-block: 16px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .card {
-  width: 100%; max-width: 440px; text-align: center; margin: auto;
+  width: 100%; max-width: 440px; text-align: center; margin: auto; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 12px; align-items: center;
+  background: var(--vga-blue); padding: 18px 16px;
+  border: 4px double #fff; box-shadow: 8px 8px 0 #000;
 }
 .logo {
   font-family: var(--display); font-weight: 700; font-size: clamp(64px, 18vw, 96px);
@@ -75,65 +84,81 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   text-shadow: 4px 4px 0 var(--poop), 8px 8px 0 #000; letter-spacing: 1px;
 }
 .logo small { display: block; font-size: .42em; color: var(--paper); text-shadow: 2px 2px 0 #000; letter-spacing: 3px; }
-.lede { margin: 0; font-size: 17px; line-height: 1.45; max-width: 36ch; text-wrap: balance; }
-.rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 15px; text-align: right; }
+.lede { margin: 0; font-size: 16px; line-height: 1.45; max-width: 36ch; text-wrap: balance; }
+.rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; text-align: right; width: 100%; }
 .rules li { display: flex; gap: 10px; align-items: baseline; }
-.rules b { font-family: var(--display); font-size: 22px; color: var(--mustard); min-width: 3.2ch; text-align: center; direction: ltr; font-variant-numeric: tabular-nums; }
+.rules b { font-family: var(--display); font-size: 22px; color: var(--mustard); min-width: 2.4ch; text-align: center; }
 .btn {
-  font-family: var(--display); font-size: 34px; line-height: 1; cursor: pointer;
-  border: 0; border-radius: 999px; padding: 10px 34px 12px;
-  background: var(--mustard); color: #2a1a08; box-shadow: 0 5px 0 #8a6a0c;
+  font-family: var(--display); font-size: 32px; line-height: 1; cursor: pointer;
+  border: 3px solid; border-color: #fff3b0 #8a6a0c #8a6a0c #fff3b0; border-radius: 0;
+  padding: 8px 30px 10px; background: var(--mustard); color: #2a1a08;
 }
-.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #8a6a0c; }
-.btn.ghost { background: transparent; color: var(--paper); box-shadow: inset 0 0 0 2px var(--muted); font-size: 24px; padding: 8px 22px 10px; }
+.btn:active { border-color: #8a6a0c #fff3b0 #fff3b0 #8a6a0c; }
+.btn.ghost { background: transparent; color: var(--paper); border-color: var(--muted); font-size: 24px; padding: 6px 20px 8px; }
 .hint { font-size: 13px; color: var(--muted); margin: 0; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.kicker { font-size: 14px; letter-spacing: 2px; color: var(--muted); margin: 0; }
+
+/* ballot slips */
+.slips { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.slip {
+  font-family: var(--body); font-weight: 800; font-size: 14px; line-height: 1.15; color: #1b1b2a;
+  background: #f7f3e6; border: 0; border-top: 7px solid; border-radius: 0; padding: 8px 4px 9px;
+  cursor: pointer; box-shadow: 3px 3px 0 #000; min-width: 0; overflow-wrap: anywhere;
+}
+.slip:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+.slip.blank { color: #6a6a7a; border-top-color: #c9c4b4; }
 
 /* results */
 .verdict { font-family: var(--display); font-size: 40px; line-height: 1; color: var(--mustard); margin: 0; text-wrap: balance; }
-.kicker { font-size: 14px; letter-spacing: 2px; color: var(--muted); margin: 0; }
 .big { font-family: var(--display); font-size: 72px; line-height: .9; margin: 0; font-variant-numeric: tabular-nums; }
 .big span { font-size: .45em; color: var(--muted); }
 #hemi { width: 100%; max-width: 380px; height: auto; }
-.parties { width: 100%; display: grid; gap: 4px; font-size: 14px; }
+.blocs { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.bloc { background: #12127a; padding: 6px 4px; display: grid; gap: 2px; font-size: 13px; }
+.bloc b { font-family: var(--display); font-size: 28px; line-height: 1; color: var(--mustard); font-variant-numeric: tabular-nums; }
+.parties { width: 100%; display: grid; gap: 3px; font-size: 14px; }
 .party { display: grid; grid-template-columns: 12px 1fr auto; gap: 8px; align-items: center; text-align: right; }
-.party i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.party i { width: 12px; height: 12px; display: block; }
 .party b { font-variant-numeric: tabular-nums; }
-.victims { width: 100%; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; max-height: 160px; overflow-y: auto; }
-.victim { font-size: 13px; padding: 2px 8px; border-radius: 999px; background: #24384a; border-inline-start: 4px solid; }
+.victims { width: 100%; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; max-height: 140px; overflow-y: auto; }
+.victim { font-size: 13px; padding: 2px 8px; background: #12127a; border-inline-start: 4px solid; }
 .victim.head::after { content: " · בול בראש"; color: var(--mustard); }
 .toast { font-size: 13px; color: var(--mustard); min-height: 1.2em; margin: 0; }
-@media (prefers-reduced-motion: reduce) { .btn, .pad { transition: none; } }
+.source { font-size: 11px; color: var(--muted); margin: 0; line-height: 1.4; }
+@media (prefers-reduced-motion: reduce) { .btn, .pad, .slip { transition: none; } }
 </style>
 
 <div id="app">
   <div id="stage">
-    <canvas id="game" width="420" height="760" aria-label="מגרש המשחק: גג בניין מעל מדרכה"></canvas>
+    <canvas id="game" width="420" height="760" aria-label="מגרש המשחק: גג בניין מעל הרחוב"></canvas>
 
     <div class="overlay" id="startScreen">
       <div class="card">
         <h1 class="logo">שלשלת<small>בחירות 2026</small></h1>
-        <p class="lede">אתה על הגג. למטה עוברות 8 מפלגות, סיעה אחרי סיעה, בדרך לקלפי. כל מעטפה שאתה משלשל נפתחת באוויר ומתגלה כמו שהיא באמת. מי שבורח חוזר, והמשחק נגמר רק כשכל 120 חברי הכנסת מלושלשים.</p>
+        <p class="lede">שני חברים על הגג. אחד יורק, השני משלשל. למטה עוברים 120 חברי הכנסת שנבחרו ב־27 באוקטובר, מפלגה אחרי מפלגה, בשלושה שלבים. מי שבורח חוזר, וזה נגמר רק כשכולם מלושלשים.</p>
         <ul class="rules">
-          <li><b>+3</b><span>פגיעה בראש של ח״כ (בול!)</span></li>
-          <li><b>+10</b><span>על כל סיעה שמלושלשת במלואה, וגדל מגל לגל</span></li>
-          <li><b>+1</b><span>פגיעה בגוף. רצף פגיעות מכפיל את הניקוד</span></li>
-          <li><b>0</b><span>מטריית חסינות עוצרת מנה אחת, ואז עפה</span></li>
-          <li><b>−3</b><span>פגעת באזרח מן השורה. זה בוחר!</span></li>
+          <li><b>💦</b><span>יריקה: מהירה, מתמלאת מהר. בול בראש +2</span></li>
+          <li><b>💩</b><span>שלשול: מעטפת הצבעה שנפתחת באוויר ומתיזה על כל מי שמסביב. בול בראש +3</span></li>
+          <li><b>⏳</b><span>על הגג: להחזיק כדי לטעון רחוק יותר, לשחרר כדי לירות</span></li>
+          <li><b>☂</b><span>מטריית חסינות עוצרת מנה אחת. פגיעה באזרח: −3</span></li>
         </ul>
-        <p class="hint">המעטפה נופלת שנייה שלמה, אז תכוון קדימה. המעיים ריקים? עצירות, תחכה רגע. גרור או ◀ ▶ לזוז, הקשה או 💩 לשחרר. במקלדת: חיצים ורווח.</p>
-        <button class="btn" id="startBtn" type="button">לשלשל!</button>
+        <p class="hint">גרירה או ◀ ▶ לזוז. במקלדת: חיצים, X ליריקה, רווח לשלשול.</p>
+        <p class="kicker">בחר פתק כדי להתחיל</p>
+        <div class="slips" id="slips"></div>
         <p class="hint" id="bestLine"></p>
       </div>
     </div>
 
     <div class="overlay" id="endScreen" hidden>
       <div class="card">
-        <p class="kicker">תוצאות האמת · קלפי 120</p>
+        <p class="kicker">סוף הסבב · הכנסת ה־26 מלושלשת</p>
         <h2 class="verdict" id="verdict"></h2>
         <p class="big" id="bigCount"></p>
         <p class="lede" id="endLede"></p>
-        <svg id="hemi" viewBox="0 0 340 186" role="img" aria-label="מליאת הכנסת המלושלשת. נקודה צהובה מסמנת בול בראש"></svg>
+        <p class="lede" id="voteLine"></p>
+        <svg id="hemi" viewBox="0 0 340 186" role="img" aria-label="מליאת הכנסת לפי תוצאות הבחירות. נקודה צהובה מסמנת בול בראש"></svg>
+        <div class="blocs" id="blocList"></div>
         <div class="parties" id="partyList"></div>
         <p class="kicker">את מי שלשלת היום בבחירות</p>
         <div class="victims" id="victims"></div>
@@ -142,6 +167,7 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
           <button class="btn ghost" id="shareBtn" type="button">העתק תוצאה</button>
         </div>
         <p class="toast" id="toast"></p>
+        <p class="source">המנדטים לפי ספירת 99.9% מהקולות בבחירות לכנסת ה־26 (27.10.2026). התוצאות הרשמיות צפויות ב־4 בנובמבר. שמות המפלגות אמיתיים, חברי הכנסת במשחק בדויים.</p>
       </div>
     </div>
   </div>
@@ -149,36 +175,60 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   <div id="deck">
     <button class="pad mute" id="muteBtn" type="button" aria-label="השתקה">🔊</button>
     <button class="pad" id="leftBtn" type="button" aria-label="זוז שמאלה">◀</button>
-    <button class="pad drop" id="dropBtn" type="button" aria-label="שחרר">💩</button>
+    <button class="pad spit" id="spitBtn" type="button" aria-label="לירוק">💦<small>יריקה</small></button>
+    <button class="pad drop" id="dropBtn" type="button" aria-label="לשלשל">💩<small>שלשול</small></button>
     <button class="pad" id="rightBtn" type="button" aria-label="זוז ימינה">▶</button>
   </div>
 </div>
-
 <script>
 (() => {
   const W = 420, H = 760, ROOF = 150, GROUND = 676, G = 900, TOTAL = 120;
+  const LEDGE = 556;                       // top view: where the roof ends and the street begins
+  const LANES = [168, 440, 505];           // top view: far sidewalk, near sidewalk (two lanes)
+  const CAR_LANES = [[256, 1], [336, -1]]; // top view: road lanes and their direction
+  const PIX = 2;                           // one retro pixel = 2 game units, so the world renders at 210×380
   const cvs = document.getElementById('game');
-  const ctx = cvs.getContext('2d');
+  const mctx = cvs.getContext('2d');
+  const low = document.createElement('canvas'); low.width = W / PIX; low.height = H / PIX;
+  const lctx = low.getContext('2d');
+  let ctx = lctx; // world draws into the low-res buffer; texts and HUD draw full-res on top
 
-  // ---------- fictional parties & members ----------
+  // ---------- real parties, fictional members ----------
+  // Elections to the 26th Knesset, 27 Oct 2026: seats at 99.9% of the vote counted
+  // (Central Elections Committee, as reported by the Times of Israel). Official results are due 4 Nov 2026.
+  const BLOCS = ['גוש נתניהו', 'גוש איזנקוט', 'המפלגות הערביות'];
   const PARTIES = [
-    { name: 'סיעת הכיסא הנצחי',      color: '#3d7bd9', seats: 28 },
-    { name: 'יש מה לחלק',             color: '#2fb6a3', seats: 22 },
-    { name: 'הבית הדרום־צפוני',       color: '#e08a2c', seats: 17 },
-    { name: 'התנועה לנאומים ארוכים',  color: '#c94b8c', seats: 14 },
-    { name: 'רשימת הוועדות המאוחדת',  color: '#8a63d2', seats: 12 },
-    { name: 'אחדות לפעמים',           color: '#d9cf3d', seats: 11 },
-    { name: 'הירוקים מקנאה',          color: '#59b84a', seats: 9 },
-    { name: 'מפלגת הקואליציה הזמנית', color: '#e2574c', seats: 7 },
+    { name: 'הליכוד',          color: '#2f5fd0', seats: 27, bloc: 0 },
+    { name: 'ישר!',            color: '#19a7a0', seats: 21, bloc: 1 },
+    { name: 'ביחד',            color: '#f08c2a', seats: 12, bloc: 1 },
+    { name: 'הרשימה המשותפת',  color: '#2e9e4f', seats: 11, bloc: 2 },
+    { name: 'רע״מ',            color: '#a3cf3a', seats: 8,  bloc: 2 },
+    { name: 'הדמוקרטים',       color: '#e5443b', seats: 8,  bloc: 1 },
+    { name: 'עוצמה יהודית',    color: '#f2d13c', seats: 7,  bloc: 0 },
+    { name: 'יהדות התורה',     color: '#7272b8', seats: 7,  bloc: 0 },
+    { name: 'ישראל ביתנו',     color: '#4fb0ea', seats: 7,  bloc: 1 },
+    { name: 'ש״ס',             color: '#c9963a', seats: 6,  bloc: 0 },
+    { name: 'הציונות הדתית',   color: '#a865c9', seats: 6,  bloc: 0 },
   ];
+  // Waves go from the smallest list to the largest; stages group them.
+  const WAVES = PARTIES.map((p, i) => i).sort((a, b) => PARTIES[a].seats - PARTIES[b].seats || a - b);
+  const STAGES = [
+    { name: 'הגג', sub: 'מבט מלמעלה. להחזיק, לכוון, לשחרר', view: 'top', bg: 'top', from: 0, to: 5 },
+    { name: 'המדרכה', sub: 'מול הקלפי. נופל ישר למטה', view: 'side', bg: 'street', from: 5, to: 9 },
+    { name: 'שער הכנסת', sub: 'כניסת חברי כנסת בלבד', view: 'side', bg: 'knesset', from: 9, to: 11 },
+  ];
+  const stageOf = w => STAGES.findIndex(s => w >= s.from && w < s.to);
+
   const FIRST = ['אבי','יוסי','מירי','שלומי','רונית','דודו','אורנה','מוטי','שרון','גלית','קובי','בני','אתי','רמי','חני','ששון','פנינה','ניסים','לימור','עמוס','אילנה','צחי','סיגל','חיים','זהבה','אלי','נורית','שמוליק','דנה','רפי'];
   const LAST = ['כיסאי','נאומי','ועדתי','פרוטוקולי','הצבעון','דיונוב','קואליציוני','אופוזיצקי','תקציבי','חסינותי','מליאתי','פריימריזון','שולחני','הסכמי','מנדטי','סעיפי','תיקוני','מקורבי','ג׳ובניק','הדלפון','שריונוב','רוטציה','פיליבסטר','ויכוחי'];
-  const QUOTES = ['שערורייה!','זו רדיפה פוליטית!','ועדת חקירה ממלכתית!','פייק ניוז!','אני לא יורד מהכיסא!','אגיש הצעת חוק!','הכול באשמת השמאל!','הכול באשמת הימין!','זה ייכנס לפרוטוקול!','אני מחזיק פה רוב!','איפה היועמ״ש?!','זה החליפה מהפריימריז!'];
-  const CIT_QUOTES = ['אני רק הלכתי לקנות לחם!','זה מה שמקבל בוחר?','אני מצביע מחר בבוקר...','אוי, הנעליים!'];
+  const QUOTES = ['שערורייה!','זו רדיפה פוליטית!','ועדת חקירה ממלכתית!','פייק ניוז!','אני לא יורד מהכיסא!','אגיש הצעת חוק!','הכול באשמת השמאל!','הכול באשמת הימין!','זה ייכנס לפרוטוקול!','אני מחזיק פה רוב!','איפה היועמ״ש?!','זה החליפה מהפריימריז!','אני ארוץ לבד!','הסכם עודפים איתכם!'];
+  const CIT_QUOTES = ['אני רק הלכתי לקנות לחם!','זה מה שמקבל בוחר?','בשביל זה הצבעתי?','אוי, הנעליים!'];
+  const DUO_LAUGHS = ['חה חה!','בול!','הה הה הה','עוד אחד!','שווה כל שקל'];
   const SUITS = ['#26324a','#3b3f46','#1e1f24','#4a3b30','#2f3c33','#514a5c'];
   const SKIN = ['#f1c9a5','#e0ac83','#c98e64','#a8714c','#f5d6bd','#8d5a3b'];
   const HAIR = ['#2a1c12','#4a3020','#9a9a9a','#d8d8d8','#6b4a2a','#141414'];
   const SHIRTS = ['#e85d4a','#3fa7d6','#f2c230','#6bbf59','#ef8bb3','#ffffff'];
+  const CAR_COLORS = ['#d43c3c','#e8e8e8','#3c6cd4','#2a2a2a','#e0b020','#8a8f96'];
 
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = a => a[(Math.random() * a.length) | 0];
@@ -208,18 +258,19 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   // ---------- state ----------
   let S;
   function newState() {
-    const members = buildMembers();
     return {
-      running: false, over: false, t: 0,
-      members, wave: -1, waveQueue: [], nextSpawn: 1.2, banner: null, finishing: 0,
-      people: [], blobs: [], splats: [], parts: [], texts: [], papers: [],
-      drops: 0, loading: false, lastStrain: -9, nextGurgle: 5,
-      px: W / 2, pvx: 0, target: null, squat: 0,
-      gut: 100, score: 0, combo: 0, best: 0, hits: 0, heads: 0, citizens: 0,
-      shake: 0,
+      running: false, over: false, t: 0, vote: null,
+      members: buildMembers(), stage: 0, wave: -1, nextWave: 0, waveQueue: [], nextSpawn: 1.2,
+      banner: null, finishing: 0, transition: 0,
+      people: [], cars: [], shots: [], splats: [], parts: [], texts: [], papers: [],
+      drops: 0, spits: 0, loading: false, lastStrain: -9, nextGurgle: 5, nextCar: 1.5,
+      px: W / 2, pvx: 0, target: null, squat: 0, lean: 0, laughA: 0, laughB: 0,
+      gut: 100, spit: 100, charge: null,
+      score: 0, combo: 0, best: 0, hits: 0, heads: 0, citizens: 0, shake: 0,
     };
   }
   S = newState();
+  const view = () => STAGES[S.stage].view;
 
   // ---------- audio ----------
   // Every sound is synthesized sample by sample into a bank of AudioBuffers on the first tap,
@@ -336,7 +387,7 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
         let v = 0; fs.forEach((r, k) => { v += r(g) * o.formants[k][2]; });
         v += br(noise()) * .05;
         const shake = .7 + .3 * Math.sin(s * 2 * Math.PI * 8 + Math.sin(s * 13));
-        const env = Math.min(1, s / .12) * shake * (t > .85 ? (1 - t) / .15 : 1);
+        const env = Math.min(1, s / (o.attack || .12)) * shake * (t > .85 ? (1 - t) / .15 : 1);
         d[i] = v * env;
       }
       return finish(d, .8);
@@ -413,6 +464,42 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
       B.blub = () => many(2, () => { const d = new Float32Array(Math.floor(sr * .25)); mix(d, bubble(sr, rnd(180, 240), .12), 0, 1); mix(d, bubble(sr, rnd(380, 460), .08), Math.floor(sr * .1), .7); return finish(d, .5); });
       B.thwap = () => many(2, () => thwap(sr));
       B.rip = () => many(2, () => { const n = Math.floor(sr * .16), d = new Float32Array(n), hp = filt('hp', 2500, .7, sr); for (let i = 0; i < n; i++) d[i] = hp(noise()) * (Math.random() < .18 ? 1 : .15) * (1 - i / n); return finish(d, .45); });
+      // hocking a loogie: a rattling throat gather that rises as it charges
+      B.hock = () => [0, 1].map(() => {
+        const n = Math.floor(sr * .6), d = new Float32Array(n), bp = filt('bp', 900, 2, sr), lp = filt('lp', 400, .8, sr);
+        for (let i = 0; i < n; i++) {
+          const t = i / n, s = i / sr;
+          if (i % 64 === 0) bp.set(700 + 900 * t, 2);
+          const rattle = .55 + .45 * Math.sign(Math.sin(s * 2 * Math.PI * (26 + 22 * t)));
+          d[i] = (bp(noise()) + lp(noise()) * .6) * rattle * Math.min(1, t * 3) * (t > .9 ? (1 - t) * 10 : 1);
+        }
+        return finish(d, .7);
+      });
+      // "ptoo": lip pop, a short vowel, and the whoosh
+      B.ptoo = () => [0, 1, 2].map(() => {
+        const n = Math.floor(sr * .25), d = new Float32Array(n), lp = filt('lp', 1500, .7, sr), hp = filt('hp', 2500, .7, sr), f0 = rnd(280, 360);
+        let ph = 0;
+        for (let i = 0; i < n; i++) {
+          const s = i / sr;
+          const pop = s < .012 ? lp(noise()) * (1 - s / .012) : 0;
+          ph += (f0 - 140 * Math.min(1, s / .08)) / sr;
+          const too = s > .01 && s < .09 ? Math.sin(ph * 2 * Math.PI) * Math.sin(Math.PI * (s - .01) / .08) * .6 : 0;
+          d[i] = pop + too + hp(noise()) * Math.exp(-s / .06) * .35;
+        }
+        return finish(d, .8);
+      });
+      // the sidekick snickering: three short voiced "heh"s
+      B.laugh = () => [105, 150].map(pitch => {
+        const one = strain(sr, { dur: .12, p0: pitch, p1: pitch * .9, attack: .01, formants: [[560, 6, 1], [1700, 9, .5], [2500, 12, .15]] });
+        const gap = Math.floor(sr * .08), d = new Float32Array(one.length * 3 + gap * 3);
+        for (let r = 0; r < 3; r++) mix(d, one, r * (one.length + gap), r === 2 ? 1 : .8);
+        return finish(d, .7);
+      });
+      B.honk = () => [0].map(() => {
+        const n = Math.floor(sr * .38), d = new Float32Array(n), lp = filt('lp', 1800, .7, sr);
+        for (let i = 0; i < n; i++) { const s = i / sr; d[i] = lp((Math.sign(Math.sin(s * 2 * Math.PI * 415)) + Math.sign(Math.sin(s * 2 * Math.PI * 520))) * .5) * (s > .15 && s < .2 ? 0 : 1); }
+        return finish(d, .5);
+      });
       B.trombone = () => [sadTrombone(sr)];
       B.flush = () => [flush(sr)];
       return B;
@@ -482,74 +569,121 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   }
 
   // ---------- canvas sizing ----------
-  let scale = 1, dpr = 1, bg = null;
+  let scale = 1, dpr = 1;
   function resize() {
     const st = document.getElementById('stage').getBoundingClientRect();
-    scale = Math.min(st.width / W, st.height / H);
+    scale = Math.min((st.width - 12) / W, (st.height - 12) / H);
     dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     cvs.style.width = (W * scale) + 'px'; cvs.style.height = (H * scale) + 'px';
     cvs.width = Math.round(W * scale * dpr); cvs.height = Math.round(H * scale * dpr);
-    bg = renderBackground(scale * dpr);
   }
 
-  // ---------- static background ----------
-  function renderBackground(k) {
-    const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
-    const g = c.getContext('2d'); g.scale(k, k);
-    // sky
-    const sky = g.createLinearGradient(0, 0, 0, ROOF); sky.addColorStop(0, '#0d1820'); sky.addColorStop(1, '#2b3d4a');
-    g.fillStyle = sky; g.fillRect(0, 0, W, ROOF);
-    g.fillStyle = 'rgba(255,255,230,.7)';
-    for (let i = 0; i < 40; i++) { const x = (i * 97) % W, y = (i * 53) % (ROOF - 30); g.fillRect(x, y, 1.5, 1.5); }
-    g.fillStyle = '#f4ecd8'; g.beginPath(); g.arc(60, 112, 14, 0, 7); g.fill();
-    g.fillStyle = '#0d1820'; g.beginPath(); g.arc(53, 108, 12, 0, 7); g.fill();
-    // facade
-    g.fillStyle = '#b9a98c'; g.fillRect(0, ROOF, W, GROUND - ROOF);
-    g.fillStyle = 'rgba(0,0,0,.06)';
-    for (let y = ROOF + 14; y < GROUND - 60; y += 14) g.fillRect(0, y, W, 1);
-    // windows
-    const cols = 5, cw = 46, ch = 58, gx = (W - cols * cw) / (cols + 1);
-    for (let r = 0; r < 5; r++) for (let col = 0; col < cols; col++) {
-      const x = gx + col * (cw + gx), y = ROOF + 40 + r * 82;
-      if (r === 2 && (col === 1 || col === 2 || col === 3)) continue; // banner space
-      g.fillStyle = '#3a3226'; g.fillRect(x - 3, y - 3, cw + 6, ch + 6);
-      const lit = ((r * 7 + col * 3) % 5) < 2;
-      g.fillStyle = lit ? '#f6d77a' : '#24323d'; g.fillRect(x, y, cw, ch);
-      g.fillStyle = '#3a3226'; g.fillRect(x + cw / 2 - 1.5, y, 3, ch); g.fillRect(x, y + ch / 2 - 1.5, cw, 3);
-      if ((r + col) % 4 === 1) { g.fillStyle = '#d6d2c8'; g.fillRect(x + 4, y + ch + 4, cw - 8, 14); g.fillStyle = '#9a968c'; for (let i = 0; i < 4; i++) g.fillRect(x + 8 + i * 8, y + ch + 7, 4, 8); }
+  // ---------- static backgrounds, rendered once at retro resolution ----------
+  const BG = {};
+  function bgFor(key) {
+    if (!BG[key]) {
+      const c = document.createElement('canvas'); c.width = W / PIX; c.height = H / PIX;
+      const g = c.getContext('2d'); g.scale(1 / PIX, 1 / PIX);
+      ({ top: bgTop, street: bgSide, knesset: bgSide })[key](g, key);
+      BG[key] = c;
     }
-    // election banner
-    const by = ROOF + 40 + 2 * 82;
-    g.fillStyle = '#f4ecd8'; g.fillRect(80, by, 260, 58);
-    g.fillStyle = '#2b5fb0'; g.fillRect(80, by, 260, 8); g.fillRect(80, by + 50, 260, 8);
-    g.fillStyle = '#1b2733'; g.font = '700 30px Karantina, Assistant, sans-serif'; g.textAlign = 'center'; g.direction = 'rtl';
-    g.fillText('בחירות לכנסת ה־26 · קלפי 120', W / 2, by + 39);
-    // street level
-    g.fillStyle = '#7e705c'; g.fillRect(0, GROUND - 72, W, 8);
-    g.fillStyle = '#4b3b2b'; g.fillRect(160, GROUND - 64, 100, 64);
-    g.fillStyle = '#f2c230'; g.fillRect(170, GROUND - 92, 80, 22);
-    g.fillStyle = '#1b2733'; g.font = '700 20px Karantina, Assistant, sans-serif'; g.fillText('קלפי ⬅', 210, GROUND - 75);
-    // posters
-    [[30, '#3d7bd9'], [320, '#e08a2c']].forEach(([x, c]) => {
-      g.fillStyle = c; g.fillRect(x, GROUND - 60, 64, 44);
-      g.fillStyle = '#f4ecd8'; g.beginPath(); g.arc(x + 20, GROUND - 40, 10, 0, 7); g.fill();
-      g.fillRect(x + 34, GROUND - 48, 24, 4); g.fillRect(x + 34, GROUND - 40, 18, 4); g.fillRect(x + 34, GROUND - 32, 22, 4);
-    });
-    // sidewalk + road
+    return BG[key];
+  }
+  const fontD = px => `700 ${px}px Karantina, Assistant, sans-serif`;
+
+  function bgTop(g) {
+    // across the street: shop roofs and awnings seen from above
+    g.fillStyle = '#5a4f63'; g.fillRect(0, 0, W, 120);
+    const roofs = ['#6e6276', '#7d6a58', '#5f6b74', '#7a5f5f'];
+    for (let i = 0, x = 0; x < W; i++) { const w = 90 + (i * 37) % 50; g.fillStyle = roofs[i % 4]; g.fillRect(x, 0, w - 4, 96); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x, 88, w - 4, 8); x += w; }
+    g.fillStyle = '#8f8f9c'; g.fillRect(40, 20, 34, 24); g.fillRect(300, 30, 26, 26); // AC units
+    const aw = ['#d94a3d', '#2f8f5f', '#e0b020', '#3c6cd4'];
+    for (let i = 0; i < 6; i++) { g.fillStyle = aw[i % 4]; g.fillRect(i * 72 + 6, 96, 60, 20); g.fillStyle = '#f4ecd8'; for (let k = 0; k < 60; k += 12) g.fillRect(i * 72 + 6 + k, 96, 6, 20); }
+    // far sidewalk
+    g.fillStyle = '#b2aa9a'; g.fillRect(0, 116, W, 100);
+    g.fillStyle = 'rgba(0,0,0,.1)'; for (let x = 0; x < W; x += 28) g.fillRect(x, 116, 2, 100); for (let y = 116; y < 216; y += 28) g.fillRect(0, y, W, 2);
+    g.fillStyle = '#d8d2c4'; g.fillRect(0, 210, W, 8);
+    // road
+    g.fillStyle = '#3a3c42'; g.fillRect(0, 218, W, 166);
+    g.fillStyle = '#e6e0cf'; for (let x = 0; x < W; x += 56) g.fillRect(x, 298, 30, 5);
+    for (let i = 0; i < 7; i++) g.fillRect(150 + i * 18, 222, 10, 158); // crosswalk
+    g.fillStyle = '#d8d2c4'; g.fillRect(0, 384, W, 8);
+    // near sidewalk, our side
+    g.fillStyle = '#bdb4a2'; g.fillRect(0, 392, W, LEDGE - 392);
+    g.fillStyle = 'rgba(0,0,0,.1)'; for (let x = 0; x < W; x += 28) g.fillRect(x, 392, 2, LEDGE - 392); for (let y = 392; y < LEDGE; y += 28) g.fillRect(0, y, W, 2);
+    // the ballot station sign on the pavement
+    g.fillStyle = '#fcd23c'; g.fillRect(16, 404, 64, 22); g.fillStyle = '#1b1b2a'; g.font = fontD(18); g.textAlign = 'center'; g.direction = 'rtl'; g.fillText('קלפי 120', 48, 421);
+    g.fillStyle = '#2f6a3a'; g.beginPath(); g.arc(380, 410, 18, 0, 7); g.fill(); g.fillStyle = '#3f8a4a'; g.beginPath(); g.arc(374, 404, 10, 0, 7); g.fill(); // tree from above
+    // roof ledge and tar roof
+    g.fillStyle = '#9a917f'; g.fillRect(0, LEDGE, W, 26);
+    g.fillStyle = '#7d7464'; g.fillRect(0, LEDGE + 22, W, 6);
+    g.fillStyle = '#4a4650'; g.fillRect(0, LEDGE + 28, W, H - LEDGE - 28);
+    g.fillStyle = 'rgba(255,255,255,.07)'; for (let i = 0; i < 260; i++) g.fillRect((i * 151) % W, LEDGE + 30 + (i * 67) % (H - LEDGE - 30), 2, 2);
+    g.fillStyle = '#77727c'; g.fillRect(10, 690, 60, 50); g.fillStyle = '#5d5862'; for (let k = 0; k < 5; k++) g.fillRect(14, 694 + k * 9, 52, 4); // AC on our roof
+    g.fillStyle = '#c9c4b4'; g.beginPath(); g.arc(380, 712, 22, 0, 7); g.fill(); g.fillStyle = '#9a968c'; g.beginPath(); g.arc(380, 712, 8, 0, 7); g.fill(); // dish
+  }
+
+  function bgSide(g, key) {
+    // sky
+    g.fillStyle = '#16163a'; g.fillRect(0, 0, W, ROOF);
+    g.fillStyle = '#24245a'; g.fillRect(0, ROOF - 50, W, 50);
+    g.fillStyle = '#fff6c8';
+    for (let i = 0; i < 40; i++) g.fillRect((i * 97) % W, (i * 53) % (ROOF - 30), 2, 2);
+    g.beginPath(); g.arc(60, 112, 14, 0, 7); g.fill(); g.fillStyle = '#16163a'; g.beginPath(); g.arc(53, 108, 12, 0, 7); g.fill();
+    if (key === 'knesset') {
+      // a long stone colonnade with a sign and the gate
+      g.fillStyle = '#d9cfb8'; g.fillRect(0, ROOF, W, GROUND - ROOF);
+      g.fillStyle = '#c4b99f'; g.fillRect(0, ROOF + 60, W, 30);
+      for (let x = 14; x < W; x += 52) { g.fillStyle = '#efe6d0'; g.fillRect(x, ROOF + 90, 26, 380); g.fillStyle = '#b8ad94'; g.fillRect(x + 22, ROOF + 90, 4, 380); }
+      g.fillStyle = '#2b2a3a'; for (let x = 40; x < W; x += 52) g.fillRect(x, ROOF + 110, 26, 340);
+      g.fillStyle = '#f4ecd8'; g.fillRect(70, ROOF + 14, 280, 40); g.fillStyle = '#1c1ca8'; g.fillRect(70, ROOF + 14, 280, 6); g.fillRect(70, ROOF + 48, 280, 6);
+      g.fillStyle = '#1b1b2a'; g.font = fontD(28); g.textAlign = 'center'; g.direction = 'rtl'; g.fillText('הכנסת ה־26 · כניסת חברי כנסת', W / 2, ROOF + 44);
+      g.fillStyle = '#3a3a44'; g.fillRect(0, GROUND - 74, W, 6);
+      g.strokeStyle = '#2a2a33'; g.lineWidth = 3; for (let x = 6; x < W; x += 14) { g.beginPath(); g.moveTo(x, GROUND - 70); g.lineTo(x, GROUND - 4); g.stroke(); } // the iron fence
+      g.fillStyle = '#c23b3b'; g.fillRect(150, GROUND - 46, 120, 8); // barrier arm
+    } else {
+      g.fillStyle = '#b9a98c'; g.fillRect(0, ROOF, W, GROUND - ROOF);
+      g.fillStyle = 'rgba(0,0,0,.06)'; for (let y = ROOF + 14; y < GROUND - 60; y += 14) g.fillRect(0, y, W, 1);
+      const cols = 5, cw = 46, ch = 58, gx = (W - cols * cw) / (cols + 1);
+      for (let r = 0; r < 5; r++) for (let col = 0; col < cols; col++) {
+        const x = gx + col * (cw + gx), y = ROOF + 40 + r * 82;
+        if (r === 2 && (col === 1 || col === 2 || col === 3)) continue;
+        g.fillStyle = '#3a3226'; g.fillRect(x - 3, y - 3, cw + 6, ch + 6);
+        g.fillStyle = ((r * 7 + col * 3) % 5) < 2 ? '#f6d77a' : '#24323d'; g.fillRect(x, y, cw, ch);
+        g.fillStyle = '#3a3226'; g.fillRect(x + cw / 2 - 1.5, y, 3, ch); g.fillRect(x, y + ch / 2 - 1.5, cw, 3);
+      }
+      const by = ROOF + 40 + 2 * 82;
+      g.fillStyle = '#f4ecd8'; g.fillRect(80, by, 260, 58);
+      g.fillStyle = '#1c1ca8'; g.fillRect(80, by, 260, 8); g.fillRect(80, by + 50, 260, 8);
+      g.fillStyle = '#1b2733'; g.font = fontD(30); g.textAlign = 'center'; g.direction = 'rtl';
+      g.fillText('בחירות לכנסת ה־26 · קלפי 120', W / 2, by + 39);
+      g.fillStyle = '#7e705c'; g.fillRect(0, GROUND - 72, W, 8);
+      g.fillStyle = '#4b3b2b'; g.fillRect(160, GROUND - 64, 100, 64);
+      g.fillStyle = '#fcd23c'; g.fillRect(170, GROUND - 92, 80, 22);
+      g.fillStyle = '#1b2733'; g.font = fontD(20); g.fillText('קלפי ⬅', 210, GROUND - 75);
+      [[30, PARTIES[0].color], [320, PARTIES[1].color]].forEach(([x, c]) => {
+        g.fillStyle = c; g.fillRect(x, GROUND - 60, 64, 44);
+        g.fillStyle = '#f4ecd8'; g.beginPath(); g.arc(x + 20, GROUND - 40, 10, 0, 7); g.fill();
+        g.fillRect(x + 34, GROUND - 48, 24, 4); g.fillRect(x + 34, GROUND - 40, 18, 4); g.fillRect(x + 34, GROUND - 32, 22, 4);
+      });
+    }
     g.fillStyle = '#a19a8e'; g.fillRect(0, GROUND - 4, W, 30);
-    g.fillStyle = 'rgba(0,0,0,.12)'; for (let x = 0; x < W; x += 30) g.fillRect(x, GROUND - 4, 1.5, 30);
+    g.fillStyle = 'rgba(0,0,0,.12)'; for (let x = 0; x < W; x += 30) g.fillRect(x, GROUND - 4, 2, 30);
     g.fillStyle = '#d8d2c4'; g.fillRect(0, GROUND + 26, W, 6);
     g.fillStyle = '#33363b'; g.fillRect(0, GROUND + 32, W, H - GROUND - 32);
     g.fillStyle = '#e6e0cf'; for (let x = 10; x < W; x += 60) g.fillRect(x, GROUND + 56, 32, 4);
-    // roof parapet
     g.fillStyle = '#8f8270'; g.fillRect(0, ROOF, W, 14);
     g.fillStyle = '#6f6455'; g.fillRect(0, ROOF + 14, W, 4);
-    return c;
   }
 
   // ---------- drawing helpers ----------
   function ell(x, y, rx, ry, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fill(); }
   function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const c = v => Math.max(0, Math.min(255, v + amt));
+    return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`;
+  }
 
   function drawPoop(x, y, s = 1, rot = 0) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
@@ -558,55 +692,70 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     ctx.fillStyle = '#a8692f'; ell(-4, -1, 4, 1.6); ell(-3, -7, 3, 1.3); ell(-2, -12, 2, 1);
     ctx.restore();
   }
+  function drawPoopTop(x, y, s = 1, rot = 0) { // the swirl, seen from above
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+    ctx.fillStyle = '#4e2c10'; circ(0, 0, 11);
+    ctx.fillStyle = '#6b3d16'; circ(1, -1, 8);
+    ctx.fillStyle = '#4e2c10'; circ(1.5, -1.5, 5);
+    ctx.fillStyle = '#8a5424'; circ(2, -2, 2.5);
+    ctx.fillStyle = '#c08a4a'; circ(-4, -4, 1.6);
+    ctx.restore();
+  }
+  function drawSpitBlob(x, y, s = 1) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.fillStyle = '#b8e3a0'; ell(0, 0, 6, 5);
+    ctx.fillStyle = '#e9f7dc'; circ(-2, -1.5, 2); circ(2, 1, 1.2);
+    ctx.fillStyle = 'rgba(184,227,160,.7)'; ell(0, 5, 2, 4);
+    ctx.restore();
+  }
+  function drawEnvelope(x, y, rot, alpha = 1, open = false, s = 1) {
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+    ctx.fillStyle = '#cfe0ee'; ctx.fillRect(-14, -9, 28, 19);
+    ctx.strokeStyle = '#4f7596'; ctx.lineWidth = 1.5; ctx.strokeRect(-14, -9, 28, 19);
+    ctx.beginPath();
+    if (open) { ctx.moveTo(-14, -9); ctx.lineTo(0, -22); ctx.lineTo(14, -9); ctx.closePath(); ctx.fillStyle = '#b7cfe3'; ctx.fill(); ctx.stroke(); }
+    else { ctx.moveTo(-14, -9); ctx.lineTo(0, 2); ctx.lineTo(14, -9); ctx.stroke(); }
+    ctx.fillStyle = S.vote != null ? PARTIES[S.vote].color : '#1c1ca8'; ctx.fillRect(-10, 4, 20, 3);
+    ctx.restore();
+  }
 
+  // ---------- side view: people and the duo ----------
   function drawHead(p, L, d) {
     const hy = -74;
     ctx.fillStyle = L.skin; ctx.fillRect(-4, -62, 8, 6);
     if (L.hairStyle === 3) { ctx.fillStyle = L.hair; ell(-d * 3, hy + 6, 16, 18); }
     ctx.fillStyle = L.skin; circ(0, hy, 15);
     circ(-d * 12, hy + 1, 4);
-    // hair
     ctx.fillStyle = L.hair;
     switch (L.hairStyle) {
-      case 0: ell(-d * 10, hy - 4, 5, 7); break; // bald with tuft
+      case 0: ell(-d * 10, hy - 4, 5, 7); break;
       case 1: ctx.beginPath(); ctx.arc(0, hy - 2, 15.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); ell(d * 4, hy - 13, 9, 4, d * .3); break;
       case 2: ctx.beginPath(); ctx.arc(0, hy - 2, 15.5, Math.PI * 1.1, Math.PI * 1.9); ctx.fill(); ctx.fillStyle = '#1f2a6b'; ell(-d * 2, hy - 15, 8, 3); break;
       case 3: ctx.beginPath(); ctx.arc(0, hy - 3, 16, Math.PI, Math.PI * 2); ctx.fill(); break;
       case 4: for (let i = 0; i < 6; i++) circ(-13 + i * 5.2, hy - 12 + Math.abs(i - 2.5) * 1.5, 5); break;
       default: ctx.beginPath(); ctx.arc(0, hy - 1, 15.5, Math.PI * 1.0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.25)'; ell(-d * 3, hy - 11, 8, 2); break;
     }
-    // face
     const ex = d * 4, ey = hy - 2;
     ctx.fillStyle = '#fff'; circ(ex, ey, 3.6); circ(ex + d * 7, ey, 3.2);
     ctx.fillStyle = '#111'; circ(ex + d * 1.2, ey + .4, 1.6); circ(ex + d * 8, ey + .4, 1.5);
-    if (L.glasses) { ctx.strokeStyle = '#111'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(ex, ey, 4.6, 0, 7); ctx.moveTo(ex + d * 11.6, ey); ctx.arc(ex + d * 7, ey, 4.4, 0, 7); ctx.stroke(); }
+    if (L.glasses) { ctx.strokeStyle = '#111'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(ex, ey, 4.6, 0, 7); ctx.moveTo(ex + d * 11.6, ey); ctx.arc(ex + d * 7, ey, 4.4, 0, 7); ctx.stroke(); }
     ctx.fillStyle = shade(L.skin, -25); ell(d * 14, hy + 3, 4, 3.4);
     if (L.stache) { ctx.fillStyle = L.hair; ell(d * 9, hy + 8, 6, 2.2); }
-    ctx.strokeStyle = '#5a2a1a'; ctx.lineWidth = 1.6; ctx.beginPath();
-    if (p.hit) { ctx.arc(d * 8, hy + 12, 3.2, 0, Math.PI * 2); } else { ctx.arc(d * 7, hy + 7, 4, .2 * Math.PI, .8 * Math.PI); }
+    ctx.strokeStyle = '#5a2a1a'; ctx.lineWidth = 1.8; ctx.beginPath();
+    if (p.hit) ctx.arc(d * 8, hy + 12, 3.2, 0, Math.PI * 2); else ctx.arc(d * 7, hy + 7, 4, .2 * Math.PI, .8 * Math.PI);
     ctx.stroke();
-  }
-
-  function shade(hex, amt) {
-    const n = parseInt(hex.slice(1), 16);
-    const c = v => Math.max(0, Math.min(255, v + amt));
-    return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`;
   }
 
   function drawPerson(p) {
     const L = p.look, d = p.dir, s = Math.sin(p.phase);
     ctx.save(); ctx.translate(p.x, GROUND);
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ell(0, 2, 18, 4);
-    // back arm
-    const arm = (sign, len) => { ctx.save(); ctx.translate(0, -54); ctx.rotate(sign * s * .6); ctx.fillStyle = shade(L.suit, -20); ctx.fillRect(-3.5, 0, 7, len); ctx.fillStyle = L.skin; circ(0, len + 2, 3.5); ctx.restore(); };
-    arm(1, 22);
-    // legs
+    ctx.save(); ctx.translate(0, -54); ctx.rotate(s * .6); ctx.fillStyle = shade(L.suit, -20); ctx.fillRect(-3.5, 0, 7, 22); ctx.fillStyle = L.skin; circ(0, 24, 3.5); ctx.restore();
     for (const i of [-1, 1]) {
       ctx.save(); ctx.translate(i * 4, -30); ctx.rotate(i * s * .5);
       ctx.fillStyle = L.pants; ctx.fillRect(-4, 0, 8, 27);
       ctx.fillStyle = '#111'; ell(d * 3, 28, 7, 3.5); ctx.restore();
     }
-    // torso
     const w = 14 + L.plump;
     ctx.fillStyle = L.suit;
     ctx.beginPath(); ctx.moveTo(-w, -60); ctx.lineTo(w, -60); ctx.lineTo(w - 1, -28); ctx.lineTo(-w + 1, -28); ctx.closePath(); ctx.fill();
@@ -614,16 +763,13 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
       const pc = PARTIES[p.member.party].color;
       ctx.fillStyle = '#f4f4f0'; ctx.beginPath(); ctx.moveTo(-5, -60); ctx.lineTo(5, -60); ctx.lineTo(0, -45); ctx.fill();
       ctx.fillStyle = pc; ctx.beginPath(); ctx.moveTo(-2.4, -58); ctx.lineTo(2.4, -58); ctx.lineTo(3.2, -38); ctx.lineTo(0, -34); ctx.lineTo(-3.2, -38); ctx.fill();
-      circ(-d * 8, -52, 2);
-    } else {
-      ctx.fillStyle = 'rgba(255,255,255,.6)'; circ(0, -46, 5);
-    }
-    // front arm + briefcase / bag
+      circ(-d * 8, -52, 2.4);
+    } else { ctx.fillStyle = 'rgba(255,255,255,.6)'; circ(0, -46, 5); }
     ctx.save(); ctx.translate(0, -54); ctx.rotate(-s * .6);
     ctx.fillStyle = shade(L.suit, 12); ctx.fillRect(-3.5, 0, 7, 22); ctx.fillStyle = L.skin; circ(0, 24, 3.5);
     if (!p.umbrella) {
       if (p.kind === 'mk') { ctx.fillStyle = '#5a3a1e'; ctx.fillRect(-9, 25, 18, 13); ctx.fillStyle = '#c7a24a'; ctx.fillRect(-2, 27, 4, 2); }
-      else { ctx.fillStyle = '#e9e3d3'; ctx.fillRect(-7, 25, 14, 16); ctx.fillStyle = '#c8a24a'; ell(0, 25, 5, 3); }
+      else { ctx.fillStyle = '#e9e3d3'; ctx.fillRect(-7, 25, 14, 16); }
     }
     ctx.restore();
     drawHead(p, L, d);
@@ -632,116 +778,245 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
       ctx.fillStyle = '#16161b'; ctx.beginPath(); ctx.arc(d * 4, -100, 32, Math.PI, 0); ctx.closePath(); ctx.fill();
       ctx.fillStyle = PARTIES[p.member.party].color;
       for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(d * 4, -100); ctx.arc(d * 4, -100, 32, Math.PI + i * Math.PI / 4, Math.PI + (i + .5) * Math.PI / 4); ctx.closePath(); ctx.fill(); }
-      ctx.fillStyle = '#f4ecd8'; ctx.font = '700 13px Karantina, Assistant, sans-serif'; ctx.textAlign = 'center'; ctx.direction = 'rtl';
-      ctx.fillText('חסינות', d * 4, -106);
     }
     if (p.hit) {
-      ctx.fillStyle = '#5e3714';
+      ctx.fillStyle = p.hitBy === 'spit' ? '#b8e3a0' : '#5e3714';
       if (p.hit === 'head') { ell(0, -88, 15, 6); ell(-6, -84, 4, 9); ell(7, -82, 3, 10); ell(0, -94, 8, 5); }
       else { ell(0, -48, 10, 7); ell(4, -40, 3, 9); }
-      // flies
       ctx.fillStyle = '#111';
-      for (let i = 0; i < 3; i++) { const a = S.t * 6 + i * 2.1; circ(Math.cos(a) * 22, -96 + Math.sin(a * 1.3) * 8, 1.6); }
+      for (let i = 0; i < 3; i++) { const a = S.t * 6 + i * 2.1; circ(Math.cos(a) * 22, -96 + Math.sin(a * 1.3) * 8, 2); }
     }
     ctx.restore();
-    if (p.bubbleT > 0 && p.bubble) {
-      ctx.save(); ctx.font = '700 15px Assistant, sans-serif'; ctx.direction = 'rtl'; ctx.textAlign = 'center';
-      const tw = ctx.measureText(p.bubble).width + 16, bx = Math.max(tw / 2 + 4, Math.min(W - tw / 2 - 4, p.x)), by = GROUND - 140;
-      ctx.globalAlpha = Math.min(1, p.bubbleT * 3);
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(bx - tw / 2, by - 15, tw, 24, 10); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(p.x - 5, by + 9); ctx.lineTo(p.x + 5, by + 9); ctx.lineTo(p.x, by + 18); ctx.fill();
-      ctx.fillStyle = '#1b2733'; ctx.fillText(p.bubble, bx, by + 3); ctx.restore();
-    }
   }
 
-  function drawPlayer() {
-    const x = S.px, y = ROOF, q = S.squat;
-    ctx.save(); ctx.translate(x, y);
+  // The duo, side view: the spitter leans over the parapet, the other one squats on it.
+  function drawDuoSide() {
+    const ax = S.px - 26, bx = S.px + 22, q = S.squat, l = S.lean;
+    // spitter: shaggy mop, red flannel
+    ctx.save(); ctx.translate(ax, ROOF); ctx.rotate(-.25 * l - Math.sin(S.laughA * 30) * .05 * (S.laughA > 0));
+    ctx.fillStyle = '#2c3e66'; ctx.fillRect(-9, -26, 7, 26); ctx.fillRect(2, -26, 7, 26);
+    ctx.fillStyle = '#b8302a'; ctx.fillRect(-12, -54, 24, 30); ctx.fillStyle = '#7a1e1a'; for (let k = 0; k < 4; k++) ctx.fillRect(-12, -50 + k * 8, 24, 2);
+    ctx.fillStyle = '#f1c9a5'; circ(0, -66, 12);
+    ctx.fillStyle = '#3b2414'; for (let k = 0; k < 7; k++) circ(-12 + k * 4, -76 + Math.abs(k - 3) * 1.6, 6); ell(-8, -64, 5, 10);
+    ctx.fillStyle = '#111'; circ(6, -67, 1.8);
+    ctx.strokeStyle = '#5a2a1a'; ctx.lineWidth = 2; ctx.beginPath(); if (l > .3) ctx.arc(9, -59, 3, 0, 7); else ctx.arc(7, -61, 4, .1 * Math.PI, .9 * Math.PI); ctx.stroke();
+    ctx.restore();
+    // pooper: backwards cap, black tee, newspaper
+    ctx.save(); ctx.translate(bx + (S.charge && S.charge.w === 'poop' ? rnd(-1, 1) : 0), ROOF);
     ctx.fillStyle = '#1b1d22'; ell(-9, -3, 7, 3.5); ell(9, -3, 7, 3.5);
     ctx.fillStyle = '#3a5a8c'; ctx.fillRect(-14, -18 + q * 4, 28, 12);
-    ctx.fillStyle = '#e85d4a'; ctx.beginPath(); ctx.roundRect(-15, -46 + q * 6, 30, 30, 8); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.fillRect(-15, -46 + q * 6, 30, 30); ctx.fillStyle = '#f4ecd8'; ctx.fillRect(-7, -38 + q * 6, 14, 8);
     ctx.fillStyle = '#f1c9a5'; circ(0, -58 + q * 6, 13);
-    ctx.fillStyle = '#2c4352'; ctx.beginPath(); ctx.arc(0, -61 + q * 6, 13.5, Math.PI, 0); ctx.fill(); ctx.fillRect(-20, -62 + q * 6, 10, 4);
-    ctx.fillStyle = '#111'; circ(-4, -56 + q * 6, 1.6); circ(5, -56 + q * 6, 1.6);
-    ctx.strokeStyle = '#5a2a1a'; ctx.lineWidth = 1.6; ctx.beginPath();
+    ctx.fillStyle = '#fcd23c'; ctx.beginPath(); ctx.arc(0, -61 + q * 6, 13.5, Math.PI, 0); ctx.fill(); ctx.fillRect(-21, -63 + q * 6, 9, 4);
+    ctx.fillStyle = '#111'; circ(-4, -56 + q * 6, 1.8); circ(5, -56 + q * 6, 1.8);
+    ctx.strokeStyle = '#5a2a1a'; ctx.lineWidth = 2; ctx.beginPath();
     if (q > .2) ctx.arc(0, -50 + q * 6, 3, 0, Math.PI * 2); else ctx.arc(0, -52, 4, .15 * Math.PI, .85 * Math.PI);
     ctx.stroke();
-    // newspaper
     ctx.fillStyle = '#efe9da'; ctx.fillRect(10, -44 + q * 6, 18, 22); ctx.fillStyle = '#9a968c'; for (let i = 0; i < 4; i++) ctx.fillRect(13, -40 + i * 5 + q * 6, 12, 2);
     ctx.restore();
   }
 
+  // ---------- top view: people, cars and the duo from behind ----------
+  function drawPersonTop(p) {
+    const L = p.look, d = p.dir, s = Math.sin(p.phase);
+    ctx.save(); ctx.translate(p.x, p.y);
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; ell(4, 5, 14, 19);
+    ctx.fillStyle = '#111'; ell(d * s * 8, -6, 5, 3); ell(-d * s * 8, 6, 5, 3);
+    ctx.fillStyle = L.skin; circ(-d * s * 6, -17, 3); circ(d * s * 6, 17, 3);
+    if (p.kind === 'mk' && !p.umbrella) { ctx.fillStyle = '#5a3a1e'; ctx.fillRect(d * s * 6 - 6, 18, 12, 6); }
+    ctx.fillStyle = L.suit; ell(0, 0, 9 + L.plump * .5, 17);
+    if (p.kind === 'mk') { ctx.fillStyle = PARTIES[p.member.party].color; circ(d * 4, -9, 3); }
+    // head from above
+    const hx = d * 2;
+    ctx.fillStyle = L.skin; circ(hx + d * 9, 0, 2.6); circ(hx, 0, 10);
+    ctx.fillStyle = L.hair;
+    switch (L.hairStyle) {
+      case 0: ell(hx - d * 5, 0, 4, 9); ctx.fillStyle = 'rgba(255,255,255,.35)'; circ(hx + d * 1, -3, 2.5); break;
+      case 1: circ(hx - d * 1, 0, 9.5); ctx.fillStyle = L.skin; ctx.fillRect(hx - 6, -1, 9, 1.6); break;
+      case 2: circ(hx - d * 1, 0, 9.5); ctx.fillStyle = '#1f2a6b'; circ(hx - d * 2, 0, 4.5); break;
+      case 3: ell(hx - d * 4, 0, 12, 11); break;
+      case 4: for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; circ(hx + Math.cos(a) * 6, Math.sin(a) * 6, 4.2); } break;
+      default: circ(hx - d * 1, 0, 9.5); ctx.fillStyle = 'rgba(255,255,255,.3)'; ell(hx - d * 2, -3, 5, 1.6); break;
+    }
+    if (p.hit) {
+      ctx.fillStyle = p.hitBy === 'spit' ? '#b8e3a0' : '#5e3714';
+      if (p.hit === 'head') { circ(hx, 0, 7); circ(hx + 5, 4, 3); circ(hx - 4, -5, 3); } else { ell(-1, 8, 6, 5); circ(3, 12, 2.5); }
+      ctx.fillStyle = '#111';
+      for (let i = 0; i < 3; i++) { const a = S.t * 6 + i * 2.1; circ(Math.cos(a) * 16, Math.sin(a * 1.3) * 16, 1.8); }
+    }
+    if (p.umbrella) {
+      const c = PARTIES[p.member.party].color;
+      for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? c : '#16161b'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 28, i * Math.PI / 4, (i + 1) * Math.PI / 4); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = '#ddd'; circ(0, 0, 2.5);
+    }
+    ctx.restore();
+  }
+
+  function drawCar(c) {
+    ctx.save(); ctx.translate(c.x, c.y); ctx.scale(c.dir, 1);
+    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(-35, -14, 74, 34);
+    ctx.fillStyle = c.color; ctx.fillRect(-38, -17, 76, 34);
+    ctx.fillStyle = shade(c.color, -40); ctx.fillRect(4, -14, 14, 28); ctx.fillRect(-26, -14, 10, 28);
+    ctx.fillStyle = shade(c.color, 25); ctx.fillRect(-16, -13, 20, 26);
+    ctx.fillStyle = '#fff6c8'; ctx.fillRect(34, -14, 4, 6); ctx.fillRect(34, 8, 4, 6);
+    ctx.restore();
+    ctx.fillStyle = '#5e3714'; for (const sp of c.splats) circ(c.x + sp * c.dir, c.y, 6);
+  }
+
+  function drawDuoTop() {
+    const charging = S.charge;
+    [['A', S.px - 38], ['B', S.px + 38]].forEach(([who, x]) => {
+      const mine = charging && charging.w === (who === 'A' ? 'spit' : 'poop');
+      const shake = (who === 'B' && mine) || (who === 'A' ? S.laughA : S.laughB) > 0 ? rnd(-1.5, 1.5) : 0;
+      const kick = who === 'A' ? S.lean : S.squat;
+      const y = 612 - kick * 10 - (mine ? charging.c * 10 : 0) + shake;
+      const shirt = who === 'A' ? '#b8302a' : '#222';
+      // arms reaching to the ledge
+      ctx.fillStyle = shirt;
+      ctx.beginPath(); ctx.moveTo(x - 40, y + 26); ctx.lineTo(x - 30, LEDGE + 10); ctx.lineTo(x - 16, LEDGE + 10); ctx.lineTo(x - 22, y + 26); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x + 40, y + 26); ctx.lineTo(x + 30, LEDGE + 10); ctx.lineTo(x + 16, LEDGE + 10); ctx.lineTo(x + 22, y + 26); ctx.fill();
+      ctx.fillStyle = '#f1c9a5'; ell(x - 23, LEDGE + 8, 8, 6); ell(x + 23, LEDGE + 8, 8, 6);
+      // back and shoulders
+      ctx.fillStyle = shirt; ell(x, y + 46, 48 + shake, 32);
+      if (who === 'A') { ctx.fillStyle = '#7a1e1a'; for (let k = -2; k <= 2; k++) ctx.fillRect(x + k * 18 - 1, y + 20, 3, 54); ctx.fillRect(x - 46, y + 44, 92, 3); }
+      else { ctx.fillStyle = '#f4ecd8'; ctx.fillRect(x - 12, y + 44, 24, 14); ctx.fillStyle = '#222'; ctx.fillRect(x - 8, y + 48, 16, 3); }
+      ctx.fillStyle = '#f1c9a5'; ell(x, y + 14, 12, 10);
+      // head from behind
+      ctx.fillStyle = '#f1c9a5'; ell(x - 27, y + 2, 5, 8); ell(x + 27, y + 2, 5, 8);
+      if (who === 'A') {
+        ctx.fillStyle = '#3b2414'; circ(x, y, 27);
+        for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 20, y + Math.sin(a) * 20); ctx.lineTo(x + Math.cos(a + .2) * 34, y + Math.sin(a + .2) * 34); ctx.lineTo(x + Math.cos(a + .45) * 20, y + Math.sin(a + .45) * 20); ctx.fill(); }
+        ctx.fillStyle = '#5a3a20'; circ(x - 6, y - 6, 9);
+      } else {
+        ctx.fillStyle = '#2a1c12'; circ(x, y + 4, 26);
+        ctx.fillStyle = '#fcd23c'; circ(x, y - 4, 23);
+        ctx.fillStyle = '#c9a020'; ctx.beginPath(); ctx.ellipse(x, y + 18, 16, 8, 0, 0, Math.PI); ctx.fill();
+        ctx.fillStyle = '#e8bc28'; for (let k = 0; k < 6; k++) { ctx.fillRect(x - 1, y - 26, 2, 22); ctx.save(); ctx.translate(x, y - 4); ctx.rotate(k * Math.PI / 3); ctx.fillRect(-1, -23, 2, 20); ctx.restore(); }
+        ctx.fillStyle = '#c9a020'; circ(x, y - 4, 3);
+      }
+    });
+  }
+
+  function drawAim() {
+    if (!S.charge || view() !== 'top') return;
+    const c = S.charge, x = shotOrigin(c.w), ly = landY(c.c);
+    const col = c.w === 'spit' ? '#b8e3a0' : '#c08a4a';
+    ctx.fillStyle = col; ctx.globalAlpha = .7;
+    for (let y = LEDGE - 6; y > ly + 10; y -= 14) ctx.fillRect(x - 1.5, y - 4, 3, 7);
+    ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 3;
+    const r = (c.w === 'spit' ? 12 : 22) + Math.sin(S.t * 18) * 2;
+    ctx.beginPath(); ctx.arc(x, ly, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillRect(x - 2, ly - 2, 4, 4);
+  }
+
+  // ---------- HUD and text, drawn full-res over the pixels ----------
+  const clock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+
+  function drawScanlines() {
+    ctx.fillStyle = 'rgba(0,0,0,.16)';
+    for (let y = 0; y < H; y += PIX * 2) ctx.fillRect(0, y, W, PIX * .6);
+  }
+
+  function drawBubbles() {
+    for (const p of S.people) {
+      if (!(p.bubbleT > 0 && p.bubble)) continue;
+      const top = view() === 'top', ty = top ? p.y - 30 : GROUND - 140;
+      ctx.save(); ctx.font = '800 15px Assistant, sans-serif'; ctx.direction = 'rtl'; ctx.textAlign = 'center';
+      const tw = ctx.measureText(p.bubble).width + 16, bx = Math.max(tw / 2 + 4, Math.min(W - tw / 2 - 4, p.x)), by = ty;
+      ctx.globalAlpha = Math.min(1, p.bubbleT * 3);
+      ctx.fillStyle = '#000'; ctx.fillRect(bx - tw / 2 + 3, by - 12, tw, 24);
+      ctx.fillStyle = '#fff'; ctx.fillRect(bx - tw / 2, by - 15, tw, 24);
+      ctx.beginPath(); ctx.moveTo(p.x - 5, by + 9); ctx.lineTo(p.x + 5, by + 9); ctx.lineTo(p.x, by + 17); ctx.fill();
+      ctx.fillStyle = '#1b1b2a'; ctx.fillText(p.bubble, bx, by + 3); ctx.restore();
+    }
+  }
+
+  function drawTexts() {
+    ctx.save(); ctx.textAlign = 'center'; ctx.direction = 'rtl';
+    for (const tx of S.texts) {
+      ctx.globalAlpha = Math.min(1, tx.t * 2); ctx.font = fontD(tx.size);
+      ctx.lineWidth = 5; ctx.strokeStyle = '#000'; ctx.strokeText(tx.text, tx.x, tx.y); ctx.fillStyle = tx.color; ctx.fillText(tx.text, tx.x, tx.y);
+    }
+    ctx.restore();
+  }
+
+  function meter(x, y, label, v, col, low) {
+    ctx.fillStyle = '#f4ecd8'; ctx.textAlign = 'left'; ctx.font = '800 13px Assistant, sans-serif'; ctx.fillText(label, x, y - 3);
+    ctx.fillStyle = '#000'; ctx.fillRect(x, y, 110, 10);
+    ctx.fillStyle = low ? '#e2574c' : col; ctx.fillRect(x + 1, y + 1, 108 * v / 100, 8);
+  }
+
   function drawHUD() {
     ctx.save(); ctx.direction = 'rtl';
-    // party strip: one segment per party, right to left in wave order, filling brown as members get pooped
     let sx = W - 14; const sw = W - 28;
     WAVES.forEach((pi, wi) => {
       const p = PARTIES[pi], w = sw * p.seats / TOTAL, h = S.members.filter(m => m.party === pi && m.hit).length;
       ctx.fillStyle = p.color; ctx.fillRect(sx - w + 1, 6, w - 2, 9);
       ctx.fillStyle = '#5e3714'; ctx.fillRect(sx - w * h / p.seats + 1, 6, w * h / p.seats - 2, 9);
-      if (wi === S.wave) { ctx.strokeStyle = '#f4ecd8'; ctx.lineWidth = 2; ctx.strokeRect(sx - w + 1, 5, w - 2, 11); }
+      if (wi === S.wave) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(sx - w + 1, 5, w - 2, 11); }
       sx -= w;
     });
     ctx.fillStyle = '#f4ecd8'; ctx.textAlign = 'right';
-    ctx.font = '700 34px Karantina, Assistant, sans-serif'; ctx.fillText(`ניקוד ${S.score}`, W - 14, 50);
-    ctx.font = '600 15px Assistant, sans-serif';
-    ctx.fillText(`מלושלשים ${S.hits}/${TOTAL} · ${clock(S.t)}`, W - 14, 72);
-    if (S.wave >= 0) { const p = PARTIES[WAVES[S.wave]]; ctx.fillStyle = p.color; ctx.fillText(`גל ${S.wave + 1}/8 · ${p.name}`, W - 14, 92); }
-    // gut meter
-    ctx.fillStyle = '#f4ecd8'; ctx.textAlign = 'left'; ctx.fillText(S.gut < 20 ? 'מעיים · עצירות!' : 'מעיים', 14, 36);
-    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(14, 42, 120, 12);
-    ctx.fillStyle = S.gut >= 20 ? '#a8692f' : '#e2574c'; ctx.fillRect(14, 42, 120 * S.gut / 100, 12);
-    ctx.strokeStyle = '#f4ecd8'; ctx.lineWidth = 1; ctx.strokeRect(14.5, 42.5, 119, 11);
-    const m = mult();
-    if (S.combo > 1) { ctx.fillStyle = '#f2c230'; ctx.font = '700 26px Karantina, Assistant, sans-serif'; ctx.fillText(`רצף ${S.combo} · x${m}`, 14, 80); }
-    // wave banner
+    ctx.font = fontD(34); ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+    ctx.strokeText(`ניקוד ${S.score}`, W - 14, 50); ctx.fillText(`ניקוד ${S.score}`, W - 14, 50);
+    ctx.font = '800 15px Assistant, sans-serif'; ctx.lineWidth = 3;
+    const l2 = `מלושלשים ${S.hits}/${TOTAL} · ${clock(S.t)}`;
+    ctx.strokeText(l2, W - 14, 72); ctx.fillText(l2, W - 14, 72);
+    if (S.wave >= 0) {
+      const p = PARTIES[WAVES[S.wave]], l3 = `שלב ${S.stage + 1} · ${p.name}`;
+      ctx.strokeText(l3, W - 14, 92); ctx.fillStyle = p.color; ctx.fillText(l3, W - 14, 92);
+    }
+    meter(14, 34, S.gut < 34 ? '💩 עצירות!' : '💩 מעיים', S.gut, '#a8692f', S.gut < 34);
+    meter(14, 64, S.spit < 15 ? '💦 יבש בפה' : '💦 רוק', S.spit, '#9fe08a', S.spit < 15);
+    if (S.combo > 1) { ctx.fillStyle = '#fcd23c'; ctx.font = fontD(26); ctx.textAlign = 'left'; ctx.strokeText(`רצף ${S.combo} · x${mult()}`, 14, 100); ctx.fillText(`רצף ${S.combo} · x${mult()}`, 14, 100); }
+    if (S.charge && view() === 'top') {
+      const x = shotOrigin(S.charge.w);
+      ctx.fillStyle = '#000'; ctx.fillRect(x - 31, 742, 62, 10);
+      ctx.fillStyle = S.charge.w === 'spit' ? '#9fe08a' : '#a8692f'; ctx.fillRect(x - 30, 743, 60 * S.charge.c, 8);
+    }
     if (S.banner && S.banner.t > 0) {
       const B = S.banner, a = Math.min(1, B.t * 2, (B.dur - B.t) * 4);
       ctx.globalAlpha = a; ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(10,18,24,.85)'; ctx.fillRect(0, 262, W, 112);
+      ctx.fillStyle = '#1c1ca8'; ctx.fillRect(0, 262, W, 112);
       ctx.fillStyle = B.color; ctx.fillRect(0, 262, W, 6); ctx.fillRect(0, 368, W, 6);
-      ctx.fillStyle = '#f2c230'; ctx.font = '700 30px Karantina, Assistant, sans-serif'; ctx.fillText(B.kicker, W / 2, 302);
-      ctx.fillStyle = '#f4ecd8'; ctx.font = '700 40px Karantina, Assistant, sans-serif'; ctx.fillText(B.title, W / 2, 342);
-      ctx.fillStyle = '#9fb3bf'; ctx.font = '600 14px Assistant, sans-serif'; ctx.fillText(B.sub, W / 2, 362);
+      ctx.fillStyle = '#fcd23c'; ctx.font = fontD(30); ctx.fillText(B.kicker, W / 2, 302);
+      ctx.fillStyle = '#f4ecd8'; ctx.font = fontD(42); ctx.fillText(B.title, W / 2, 342);
+      ctx.fillStyle = '#a9b4d6'; ctx.font = '700 14px Assistant, sans-serif'; ctx.fillText(B.sub, W / 2, 362);
     }
-    ctx.restore();
-  }
-
-  const clock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
-
-  function drawEnvelope(x, y, rot, alpha = 1, open = false) {
-    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(rot);
-    ctx.fillStyle = '#cfe0ee'; ctx.fillRect(-14, -9, 28, 19);
-    ctx.strokeStyle = '#4f7596'; ctx.lineWidth = 1.2; ctx.strokeRect(-14, -9, 28, 19);
-    ctx.beginPath();
-    if (open) { ctx.moveTo(-14, -9); ctx.lineTo(0, -22); ctx.lineTo(14, -9); ctx.closePath(); ctx.fillStyle = '#b7cfe3'; ctx.fill(); ctx.stroke(); }
-    else { ctx.moveTo(-14, -9); ctx.lineTo(0, 2); ctx.lineTo(14, -9); ctx.stroke(); }
-    ctx.fillStyle = '#2b5fb0'; ctx.fillRect(-10, 4, 20, 3);
     ctx.restore();
   }
 
   // ---------- game logic ----------
   const mult = () => Math.min(5, 1 + Math.floor(S.combo / 3));
-  // Waves go from the smallest party to the largest
-  const WAVES = PARTIES.map((p, i) => i).sort((a, b) => PARTIES[a].seats - PARTIES[b].seats);
+  const COST = { spit: 15, poop: 34 };
+  const METER = { spit: 'spit', poop: 'gut' };
+  const shotOrigin = w => view() === 'top' ? S.px + (w === 'spit' ? -38 : 38) : S.px + (w === 'spit' ? -26 : 22);
+  const landY = c => LEDGE - 12 - c * 420;
+  const speedUp = () => Math.max(0, S.wave) * 5;
 
   function startWave(i) {
     S.wave = i;
     const pi = WAVES[i], p = PARTIES[pi];
-    S.waveQueue = shuffle(S.members.filter(m => m.party === pi));
-    S.banner = { kicker: `גל ${i + 1} מתוך 8`, title: p.name, sub: `${p.seats} ח״כים · מי שבורח חוזר`, color: p.color, t: 2.4, dur: 2.4 };
+    S.waveQueue = shuffle(S.members.filter(m => m.party === pi && !m.hit));
+    S.banner = { kicker: `גל ${i + 1} מתוך ${WAVES.length}`, title: p.name, sub: `${p.seats} מנדטים · ${BLOCS[p.bloc]} · מי שבורח חוזר`, color: p.color, t: 2.4, dur: 2.4 };
     S.nextSpawn = 2.2;
   }
 
+  function enterStage(si) {
+    S.stage = si; S.people = []; S.cars = []; S.splats = []; S.shots = []; S.papers = []; S.charge = null;
+    startWave(S.nextWave);
+  }
+
   function spawnOne(kind) {
-    const dir = Math.random() < .5 ? 1 : -1;
+    const dir = Math.random() < .5 ? 1 : -1, top = view() === 'top';
     const p = { kind, dir, x: dir > 0 ? -30 : W + 30, phase: Math.random() * 6, look: makeLook(kind), hit: null, bubble: '', bubbleT: 0 };
+    if (top) p.y = pick(LANES) + rnd(-6, 6);
     if (kind === 'mk') {
       p.member = S.waveQueue.shift();
       p.look = p.member.look || (p.member.look = makeLook('mk'));
-      p.speed = rnd(45, 72) + Math.max(0, S.wave) * 7 + (p.member.returns || 0) * 5;
-      p.umbrella = Math.random() < .04 + Math.max(0, S.wave) * .025;
-    } else { p.speed = rnd(35, 60); }
+      p.speed = (rnd(45, 72) + speedUp() + (p.member.returns || 0) * 5) * (top ? .8 : 1);
+      p.umbrella = Math.random() < .04 + Math.max(0, S.wave) * .022;
+    } else p.speed = rnd(35, 60);
     S.people.push(p);
     return p;
   }
@@ -750,132 +1025,215 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     S.nextSpawn -= dt;
     if (S.nextSpawn > 0 || !S.waveQueue.length) return;
     const onScreen = S.people.filter(p => p.kind === 'mk' && !p.hit).length;
-    if (onScreen >= 3 + Math.floor(S.wave / 2)) { S.nextSpawn = .3; return; }
+    if (onScreen >= 3 + Math.floor(S.wave / 3)) { S.nextSpawn = .3; return; }
     if (Math.random() < .14) spawnOne('cit');
     else {
-      spawnOne('mk');
-      if (S.wave >= 2 && Math.random() < .25 && S.waveQueue.length) { const q = spawnOne('mk'); q.dir = S.people[S.people.length - 2].dir; q.x = q.dir > 0 ? -70 : W + 70; }
+      const a = spawnOne('mk');
+      if (S.wave >= 3 && Math.random() < .25 && S.waveQueue.length) { const q = spawnOne('mk'); q.dir = a.dir; q.x = q.dir > 0 ? -70 : W + 70; if (a.y != null) q.y = a.y; }
     }
-    S.nextSpawn = rnd(.7, 1.2) * (1.4 - S.wave * .08);
+    S.nextSpawn = rnd(.7, 1.2) * Math.max(.6, 1.4 - S.wave * .07);
   }
 
   function checkWave() {
-    if (S.wave < 0 || S.finishing) return;
+    if (S.wave < 0 || S.finishing || S.transition) return;
     const pi = WAVES[S.wave];
     if (S.members.some(m => m.party === pi && !m.hit)) return;
     const bonus = 10 * (S.wave + 1);
     S.score += bonus;
-    addText(W / 2, 250, `${PARTIES[pi].name} מלושלשת! +${bonus}`, '#f2c230', 28);
+    addText(W / 2, 240, `${PARTIES[pi].name} מלושלשת! +${bonus}`, '#fcd23c', 28);
     SFX.play('flush', { vol: .5 });
-    if (S.wave < WAVES.length - 1) startWave(S.wave + 1);
-    else S.finishing = 1.6;
+    const next = S.wave + 1;
+    if (next >= WAVES.length) { S.finishing = 1.6; return; }
+    S.nextWave = next;
+    const ns = stageOf(next);
+    if (ns !== S.stage) {
+      S.transition = 3.2; S.waveQueue = [];
+      S.banner = { kicker: `שלב ${ns + 1} מתוך ${STAGES.length}`, title: STAGES[ns].name, sub: STAGES[ns].sub, color: '#fcd23c', t: 3.2, dur: 3.2 };
+    } else startWave(next);
   }
 
-  function drop() {
-    if (!S.running) return;
-    if (S.gut < 20) {
-      if (S.t - S.lastStrain > .9) {
-        S.lastStrain = S.t; S.squat = 1;
-        addText(S.px, ROOF + 44, 'עצירות!', '#e2574c');
-        SFX.play('strain', { x: S.px, vol: .9 });
-        SFX.play('squeakFail', { x: S.px, vol: .6, delay: .6 });
-      }
-      return;
+  function addText(x, y, text, color = '#fcd23c', size = 26) { S.texts.push({ x, y, text, color, size, t: 1.1 }); }
+  function burst(x, y, n = 10, color = '#6b3d16') { for (let i = 0; i < n; i++) S.parts.push({ x, y, vx: rnd(-120, 120), vy: rnd(-220, -40), t: rnd(.4, .8), color }); }
+  const textY = p => view() === 'top' ? p.y - 34 : GROUND - 120;
+
+  // The weapon buttons: on the roof view you hold to charge range; on the side views it fires at once.
+  function press(w) {
+    if (!S.running || S.transition) return;
+    if (S[METER[w]] < COST[w]) { fail(w); return; }
+    if (view() !== 'top') { fire(w, 0); return; }
+    if (S.charge) return;
+    S.charge = { w, c: 0 };
+    SFX.play(w === 'spit' ? 'hock' : 'strain', { x: shotOrigin(w), vol: w === 'spit' ? .8 : .6 });
+  }
+  function release(w) {
+    if (!S.charge || S.charge.w !== w) return;
+    const c = S.charge.c; S.charge = null;
+    fire(w, c);
+  }
+
+  function fail(w) {
+    if (S.t - S.lastStrain < .9) return;
+    S.lastStrain = S.t;
+    const x = shotOrigin(w), y = view() === 'top' ? LEDGE - 20 : ROOF + 44;
+    if (w === 'poop') {
+      S.squat = 1; addText(x, y, 'עצירות!', '#e2574c');
+      SFX.play('strain', { x, vol: .9 }); SFX.play('squeakFail', { x, vol: .6, delay: .6 });
+    } else { S.lean = 1; addText(x, y, 'יבש בפה!', '#e2574c'); SFX.play('pfft', { x, vol: .5, rate: 1.6 }); }
+  }
+
+  function fire(w, c) {
+    S[METER[w]] -= COST[w];
+    const x = shotOrigin(w);
+    if (w === 'spit') { S.spits++; S.lean = 1; SFX.play('ptoo', { x }); }
+    else {
+      S.drops++; S.squat = 1;
+      const kind = fartFor(S.combo, S.gut);
+      SFX.play(kind, { x, vol: kind === 'pfft' ? 1 : .75 });
+      if (S.gut < COST.poop) { S.loading = true; SFX.play('strain', { x, vol: .45, delay: .4 }); }
     }
-    const kind = fartFor(S.combo, S.gut);
-    S.gut -= 20; S.squat = 1; S.drops++;
-    S.blobs.push({ x: S.px, y: ROOF + 6, y0: ROOF + 6, vx: S.pvx * .35, vy: 30, rot: rnd(-.3, .3), open: false, age: 0 });
-    SFX.play(kind, { x: S.px, vol: kind === 'pfft' ? 1 : .75 });
-    if (S.gut < 20) { S.loading = true; SFX.play('strain', { x: S.px, vol: .5, delay: .4 }); }
+    if (view() === 'top') {
+      S.shots.push({ w, top: true, x0: x, x, y0: LEDGE + 4, y: LEDGE + 4, lx: x + S.pvx * .15, ly: landY(c), u: 0, T: w === 'spit' ? .22 + .3 * c : .35 + .45 * c, open: w === 'spit', rot: rnd(0, 6), age: 0 });
+    } else {
+      S.shots.push({ w, top: false, x, y: ROOF + 6, y0: ROOF + 6, vx: S.pvx * .35, vy: w === 'spit' ? 260 : 30, rot: rnd(-.3, .3), open: w === 'spit', age: 0 });
+    }
   }
 
-  function addText(x, y, text, color = '#f2c230', size = 26) { S.texts.push({ x, y, text, color, size, t: 1.1 }); }
-  function burst(x, y, n = 10) { for (let i = 0; i < n; i++) S.parts.push({ x, y, vx: rnd(-120, 120), vy: rnd(-220, -40), t: rnd(.4, .8) }); }
+  function splatSound(s, zone) { SFX.play(zone === 'head' ? 'splatHead' : zone === 'body' ? 'splatBody' : 'splatGround', { x: s.x, vol: s.w === 'spit' ? .6 : 1, rate: s.w === 'spit' ? 1.5 : 1 }); }
 
-  function land(b, sound) {
-    burst(b.x, b.y, sound === 'splatGround' ? 8 : 12);
-    SFX.play(sound, { x: b.x, vol: sound === 'splatHead' ? 1 : .85 });
-  }
-
-  function hitPerson(b, p, zone) {
-    land(b, zone === 'head' ? 'splatHead' : 'splatBody');
+  function hitPerson(s, p, zone, quiet) {
+    if (!quiet) splatSound(s, zone);
+    burst(s.x, s.y, 8, s.w === 'spit' ? '#b8e3a0' : '#6b3d16');
     if (p.kind === 'cit') {
       SFX.play('trombone', { vol: .7, delay: .15 });
       S.score -= 3; S.combo = 0; S.citizens++;
-      addText(p.x, GROUND - 120, 'זה בוחר! −3', '#e2574c');
-      p.hit = p.hit || zone; p.bubble = pick(CIT_QUOTES); p.bubbleT = 1.6; p.speed *= 1.6;
+      addText(p.x, textY(p), 'זה בוחר! −3', '#e2574c');
+      p.hit = p.hit || zone; p.hitBy = p.hitBy || s.w; p.bubble = pick(CIT_QUOTES); p.bubbleT = 1.6; p.speed *= 1.6;
       return;
     }
-    if (p.hit) { S.score += 1; addText(p.x, GROUND - 120, 'עוד מנה +1'); return; }
-    S.combo++; const m = mult(), pts = (zone === 'head' ? 3 : 1) * m;
+    if (p.hit) { S.score += 1; addText(p.x, textY(p), 'עוד מנה +1'); return; }
+    S.combo++;
+    const pts = (s.w === 'spit' ? (zone === 'head' ? 2 : 1) : (zone === 'head' ? 3 : 2)) * mult();
     S.score += pts; S.hits++; if (zone === 'head') { S.heads++; S.shake = .25; }
     S.best = Math.max(S.best, S.combo);
-    p.hit = zone; p.member.hit = zone; p.bubble = pick(QUOTES); p.bubbleT = 1.8; p.speed *= 1.7;
-    addText(p.x, GROUND - 120, zone === 'head' ? `בול! +${pts}` : `+${pts}`);
+    p.hit = zone; p.hitBy = s.w; p.member.hit = zone; p.member.hitBy = s.w;
+    p.bubble = pick(QUOTES); p.bubbleT = 1.8; p.speed *= 1.7;
+    addText(p.x, textY(p), zone === 'head' ? `בול! +${pts}` : `+${pts}`);
+    if (S.vote === p.member.party) addText(p.x, textY(p) - 26, 'ביקורת עצמית', '#a9b4d6', 20);
+    // the other one laughs
+    if (s.w === 'spit') S.laughB = .8; else S.laughA = .8;
+    if (Math.random() < .6) {
+      const lx = shotOrigin(s.w === 'spit' ? 'poop' : 'spit');
+      setTimeout(() => SFX.play('laugh', { x: lx, vol: .7 }), 250);
+      addText(lx, view() === 'top' ? LEDGE - 24 : ROOF - 90, pick(DUO_LAUGHS), '#f4ecd8', 22);
+    }
     checkWave();
   }
 
-  function update(dt) {
-    S.t += dt;
-    // movement
-    let ax = 0;
-    if (keys.left) ax -= 1; if (keys.right) ax += 1;
-    if (ax) { S.target = null; S.pvx = ax * 280; }
-    else if (S.target != null) { const dx = S.target - S.px; S.pvx = Math.abs(dx) < 3 ? 0 : Math.sign(dx) * Math.min(320, Math.abs(dx) * 9); }
-    else S.pvx = 0;
-    S.px = Math.max(24, Math.min(W - 24, S.px + S.pvx * dt));
-    S.squat = Math.max(0, S.squat - dt * 4);
-    S.gut = Math.min(100, S.gut + dt * 24);
-    if (S.loading && S.gut >= 20) { S.loading = false; SFX.play('blub', { x: S.px, vol: .7 }); }
-    if ((S.nextGurgle -= dt) <= 0) { S.nextGurgle = rnd(5, 9); SFX.play('gurgle', { vol: .35 }); }
-    if (S.banner) S.banner.t -= dt;
-    S.shake = Math.max(0, S.shake - dt);
+  function umbrellaBlock(s, p) {
+    burst(s.x, s.y, 6, s.w === 'spit' ? '#b8e3a0' : '#6b3d16'); SFX.play('thwap', { x: s.x });
+    p.umbrella = false;
+    S.papers.push({ x: p.x, y: view() === 'top' ? p.y : GROUND - 110, vx: p.dir * 140, vy: -260, rot: 0, vr: 8, t: 1.4, umbrella: true });
+    addText(p.x, textY(p) - 20, 'החסינות הוסרה!', '#a9b4d6', 22);
+  }
 
-    spawnTick(dt);
+  // Top view landing: spit hits one person, poop splashes everyone close by.
+  function landTop(s) {
+    const R = s.w === 'spit' ? 18 : 30, HEAD = s.w === 'spit' ? 10 : 14;
+    const near = S.people.map(p => ({ p, d: Math.hypot(p.x - s.lx, p.y - s.ly) })).filter(o => o.d < (o.p.umbrella ? 30 : R)).sort((a, b) => a.d - b.d);
+    if (near.length && near[0].p.umbrella) { umbrellaBlock(s, near[0].p); return; }
+    const targets = s.w === 'spit' ? near.slice(0, 1) : near.filter(o => !o.p.umbrella);
+    if (targets.length) { targets.forEach((o, i) => hitPerson(s, o.p, o.d < HEAD ? 'head' : 'body', i > 0)); return; }
+    S.combo = 0;
+    const car = S.cars.find(c => Math.abs(c.x - s.lx) < 38 && Math.abs(c.y - s.ly) < 18);
+    if (car) { car.splats.push((s.lx - car.x) * car.dir); SFX.play('honk', { x: s.lx, vol: .6 }); addText(s.lx, s.ly - 20, 'על האוטו של השר', '#a9b4d6', 20); }
+    else S.splats.push({ x: s.lx, y: s.ly, t: 8, r: s.w === 'spit' ? .6 : rnd(.9, 1.2), w: s.w });
+    splatSound(s, 'ground');
+    burst(s.lx, s.ly, 6, s.w === 'spit' ? '#b8e3a0' : '#6b3d16');
+  }
 
-    for (const p of S.people) {
-      p.x += p.dir * p.speed * dt; p.phase += dt * p.speed * .11;
-      if (p.bubbleT > 0) p.bubbleT -= dt;
-    }
-    S.people = S.people.filter(p => {
-      if (p.x > -60 && p.x < W + 60) return true;
-      if (p.kind === 'mk' && !p.hit) {
-        p.member.returns = (p.member.returns || 0) + 1;
-        S.waveQueue.push(p.member);
-        addText(p.x < 0 ? 70 : W - 70, GROUND - 150, 'ברח! יחזור', '#9fb3bf', 20);
+  function updateShotsTop(dt) {
+    for (const s of S.shots) {
+      s.u += dt / s.T; s.age += dt; s.rot += dt * 7;
+      const u = Math.min(1, s.u);
+      s.x = s.x0 + (s.lx - s.x0) * u; s.y = s.y0 + (s.ly - s.y0) * u;
+      if (!s.open && u > .3) {
+        s.open = true; s.age = 0;
+        S.papers.push({ x: s.x, y: s.y, vx: rnd(-90, 90), vy: rnd(-60, 30), rot: s.rot, vr: rnd(-5, 5), t: 1.2, flat: true });
+        SFX.play('rip', { x: s.x, vol: .5 });
       }
-      return false;
-    });
+      if (s.u >= 1) { s.dead = true; s.x = s.lx; s.y = s.ly; landTop(s); }
+    }
+  }
 
-    for (const b of S.blobs) {
+  function updateShotsSide(dt) {
+    for (const b of S.shots) {
       b.vy += G * dt; b.y += b.vy * dt; b.x += b.vx * dt; b.rot += dt * (b.open ? 3 : 7);
-      // the ballot envelope you cast opens mid-air and shows what it really was
       if (!b.open && b.y - b.y0 > 115) {
         b.open = true; b.age = 0;
         S.papers.push({ x: b.x, y: b.y, vx: b.vx + rnd(-70, 70), vy: -60, rot: b.rot, vr: rnd(-5, 5), t: 1.6 });
-        for (let i = 0; i < 6; i++) S.parts.push({ x: b.x, y: b.y, vx: rnd(-80, 80), vy: rnd(-120, 0), t: rnd(.2, .4) });
         SFX.play('rip', { x: b.x, vol: .5 });
       }
       b.age += dt;
       for (const p of S.people) {
         const dx = b.x - p.x;
-        if (p.umbrella && Math.abs(dx - p.dir * 4) < 32 && b.y > GROUND - 134 && b.y < GROUND - 98) {
-          b.dead = true; burst(b.x, b.y, 6); SFX.play('thwap', { x: b.x });
-          p.umbrella = false;
-          S.papers.push({ x: p.x, y: GROUND - 110, vx: p.dir * 140, vy: -260, rot: 0, vr: 8, t: 1.4, umbrella: true });
-          addText(p.x, GROUND - 150, 'החסינות הוסרה!', '#9fb3bf', 22); break;
-        }
-        const hy = GROUND - 74;
-        if (Math.hypot(dx, b.y - hy) < 20) { b.dead = true; hitPerson(b, p, 'head'); break; }
+        if (p.umbrella && Math.abs(dx - p.dir * 4) < 32 && b.y > GROUND - 134 && b.y < GROUND - 98) { b.dead = true; umbrellaBlock(b, p); break; }
+        if (Math.hypot(dx, b.y - (GROUND - 74)) < (b.w === 'spit' ? 16 : 20)) { b.dead = true; hitPerson(b, p, 'head'); break; }
         if (Math.abs(dx) < 16 && b.y > GROUND - 60 && b.y < GROUND - 4) { b.dead = true; hitPerson(b, p, 'body'); break; }
       }
       if (!b.dead && b.y >= GROUND + 8) {
-        b.dead = true; land(b, 'splatGround'); S.combo = 0;
-        S.splats.push({ x: b.x, y: GROUND + rnd(4, 18), t: 8, r: rnd(.8, 1.2) });
+        b.dead = true;
+        // a poop landing at someone's feet still splashes them
+        const feet = b.w === 'poop' ? S.people.filter(p => Math.abs(p.x - b.x) < 24 && !p.umbrella) : [];
+        if (feet.length) feet.forEach((p, i) => hitPerson(b, p, 'body', i > 0));
+        else { S.combo = 0; splatSound(b, 'ground'); burst(b.x, b.y, 6, b.w === 'spit' ? '#b8e3a0' : '#6b3d16'); S.splats.push({ x: b.x, y: GROUND + rnd(4, 18), t: 8, r: b.w === 'spit' ? .6 : rnd(.8, 1.2), w: b.w }); }
       }
     }
-    S.blobs = S.blobs.filter(b => !b.dead);
-    for (const q of S.papers) { q.vy += (q.umbrella ? G : 160) * dt; q.vx *= .98; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.t -= dt; }
+  }
+
+  function update(dt) {
+    S.t += dt;
+    let ax = 0;
+    if (keys.left) ax -= 1; if (keys.right) ax += 1;
+    if (ax) { S.target = null; S.pvx = ax * 280; }
+    else if (S.target != null) { const dx = S.target - S.px; S.pvx = Math.abs(dx) < 3 ? 0 : Math.sign(dx) * Math.min(320, Math.abs(dx) * 9); }
+    else S.pvx = 0;
+    const edge = view() === 'top' ? 70 : 50;
+    S.px = Math.max(edge, Math.min(W - edge, S.px + S.pvx * dt));
+    S.squat = Math.max(0, S.squat - dt * 4); S.lean = Math.max(0, S.lean - dt * 4);
+    S.laughA = Math.max(0, S.laughA - dt); S.laughB = Math.max(0, S.laughB - dt);
+    if (S.charge) S.charge.c = Math.min(1, S.charge.c + dt / (S.charge.w === 'spit' ? .7 : 1.1));
+    S.gut = Math.min(100, S.gut + dt * 20);
+    S.spit = Math.min(100, S.spit + dt * 40);
+    if (S.loading && S.gut >= COST.poop) { S.loading = false; SFX.play('blub', { x: shotOrigin('poop'), vol: .7 }); }
+    if ((S.nextGurgle -= dt) <= 0) { S.nextGurgle = rnd(5, 9); SFX.play('gurgle', { vol: .35 }); }
+    if (S.banner) S.banner.t -= dt;
+    S.shake = Math.max(0, S.shake - dt);
+    if (S.transition) { if ((S.transition -= dt) <= 0) { S.transition = 0; enterStage(stageOf(S.nextWave)); } }
+    else spawnTick(dt);
+
+    for (const p of S.people) { p.x += p.dir * p.speed * dt; p.phase += dt * p.speed * .11; if (p.bubbleT > 0) p.bubbleT -= dt; }
+    S.people = S.people.filter(p => {
+      if (p.x > -60 && p.x < W + 60) return true;
+      if (p.kind === 'mk' && !p.hit && !S.transition) {
+        p.member.returns = (p.member.returns || 0) + 1;
+        S.waveQueue.push(p.member);
+        addText(p.x < 0 ? 70 : W - 70, view() === 'top' ? p.y - 20 : GROUND - 150, 'ברח! יחזור', '#a9b4d6', 20);
+      }
+      return false;
+    });
+
+    if (view() === 'top') {
+      if ((S.nextCar -= dt) <= 0) { const [y, dir] = pick(CAR_LANES); S.cars.push({ x: dir > 0 ? -50 : W + 50, y, dir, speed: rnd(150, 230), color: pick(CAR_COLORS), splats: [] }); S.nextCar = rnd(1.8, 3.8); }
+      for (const c of S.cars) c.x += c.dir * c.speed * dt;
+      S.cars = S.cars.filter(c => c.x > -80 && c.x < W + 80);
+      updateShotsTop(dt);
+    } else updateShotsSide(dt);
+    S.shots = S.shots.filter(s => !s.dead);
+
+    for (const q of S.papers) {
+      if (q.flat) { q.vx *= .96; q.vy *= .96; } else q.vy += (q.umbrella ? G : 160) * dt;
+      q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.t -= dt;
+    }
     S.papers = S.papers.filter(q => q.t > 0);
     for (const q of S.parts) { q.vy += G * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.t -= dt; }
     S.parts = S.parts.filter(q => q.t > 0);
@@ -887,35 +1245,66 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     if (S.finishing && (S.finishing -= dt) <= 0) endGame();
   }
 
-  function render() {
-    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
-    if (S.shake > 0) ctx.translate(rnd(-3, 3) * S.shake * 4, rnd(-3, 3) * S.shake * 4);
-    if (bg) ctx.drawImage(bg, 0, 0, W, H);
+  function renderWorldTop() {
     for (const s of S.splats) {
-      ctx.globalAlpha = Math.min(1, s.t / 2); ctx.fillStyle = '#5e3714';
+      ctx.globalAlpha = Math.min(1, s.t / 2); ctx.fillStyle = s.w === 'spit' ? '#b8e3a0' : '#5e3714';
+      circ(s.x, s.y, 9 * s.r); circ(s.x + 8 * s.r, s.y + 3, 4 * s.r); circ(s.x - 7 * s.r, s.y - 4, 3.5 * s.r);
+    }
+    ctx.globalAlpha = 1;
+    S.cars.forEach(drawCar);
+    S.people.slice().sort((a, b) => a.y - b.y).forEach(drawPersonTop);
+    for (const s of S.shots) {
+      const u = Math.min(1, s.u), h = Math.sin(Math.PI * u) * 46, sc = 1.5 - .75 * u + .35 * Math.sin(Math.PI * u);
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ell(s.x, s.y, 7 * sc, 4 * sc);
+      if (s.w === 'spit') drawSpitBlob(s.x, s.y - h, sc);
+      else if (!s.open) drawEnvelope(s.x, s.y - h, s.rot, 1, false, sc);
+      else drawPoopTop(s.x, s.y - h, sc * Math.min(1, .4 + s.age * 5), s.rot);
+    }
+    for (const q of S.papers) {
+      if (q.umbrella) { ctx.save(); ctx.globalAlpha = Math.min(1, q.t); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillStyle = '#16161b'; circ(0, 0, 22); ctx.restore(); }
+      else drawEnvelope(q.x, q.y, q.rot, Math.min(1, q.t), true, .9);
+    }
+    for (const q of S.parts) { ctx.fillStyle = q.color; circ(q.x, q.y, 3); }
+    drawAim();
+    drawDuoTop();
+  }
+
+  function renderWorldSide() {
+    for (const s of S.splats) {
+      ctx.globalAlpha = Math.min(1, s.t / 2); ctx.fillStyle = s.w === 'spit' ? '#b8e3a0' : '#5e3714';
       ell(s.x, s.y, 14 * s.r, 4 * s.r); ell(s.x - 9 * s.r, s.y + 2, 5, 2); ell(s.x + 11 * s.r, s.y - 1, 4, 2);
     }
     ctx.globalAlpha = 1;
-    const ppl = S.people.slice().sort((a, b) => (a.kind === 'cit') - (b.kind === 'cit'));
-    ppl.forEach(drawPerson);
-    drawPlayer();
+    S.people.slice().sort((a, b) => (a.kind === 'cit') - (b.kind === 'cit')).forEach(drawPerson);
+    drawDuoSide();
     for (const q of S.papers) {
       if (q.umbrella) { ctx.save(); ctx.globalAlpha = Math.min(1, q.t); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillStyle = '#16161b'; ctx.beginPath(); ctx.arc(0, 0, 26, Math.PI, 0); ctx.fill(); ctx.restore(); }
       else drawEnvelope(q.x, q.y, q.rot, Math.min(1, q.t), true);
     }
-    for (const b of S.blobs) {
-      if (!b.open) drawEnvelope(b.x, b.y, b.rot);
+    for (const b of S.shots) {
+      if (b.w === 'spit') drawSpitBlob(b.x, b.y, 1.2);
+      else if (!b.open) drawEnvelope(b.x, b.y, b.rot);
       else drawPoop(b.x, b.y, Math.min(1, .35 + b.age * 6), Math.sin(b.rot) * .3);
     }
-    ctx.fillStyle = '#6b3d16';
-    for (const q of S.parts) circ(q.x, q.y, 2.6);
-    ctx.save(); ctx.textAlign = 'center'; ctx.direction = 'rtl';
-    for (const tx of S.texts) {
-      ctx.globalAlpha = Math.min(1, tx.t * 2); ctx.font = `700 ${tx.size}px Karantina, Assistant, sans-serif`;
-      ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(tx.text, tx.x, tx.y); ctx.fillStyle = tx.color; ctx.fillText(tx.text, tx.x, tx.y);
-    }
-    ctx.restore();
+    for (const q of S.parts) { ctx.fillStyle = q.color; circ(q.x, q.y, 3); }
+  }
+
+  function render() {
+    ctx = lctx;
+    lctx.setTransform(1 / PIX, 0, 0, 1 / PIX, 0, 0);
+    if (S.shake > 0) lctx.translate(rnd(-3, 3) * S.shake * 4, rnd(-3, 3) * S.shake * 4);
+    lctx.drawImage(bgFor(STAGES[S.stage].bg), 0, 0, W, H);
+    if (view() === 'top') renderWorldTop(); else renderWorldSide();
+    mctx.setTransform(1, 0, 0, 1, 0, 0);
+    mctx.imageSmoothingEnabled = false;
+    mctx.drawImage(low, 0, 0, cvs.width, cvs.height);
+    mctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    ctx = mctx;
+    drawScanlines();
+    drawBubbles();
+    drawTexts();
     if (S.running || S.over) drawHUD();
+    ctx = lctx;
   }
 
   let last = 0;
@@ -932,13 +1321,22 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   function saveBest(v) { try { localStorage.setItem('shilshelet-best', String(v)); } catch (e) {} }
   function showBest() { const b = bestScore(); $('bestLine').textContent = b ? `השיא שלך: ${b} נקודות` : ''; }
 
-  function start() {
+  function buildSlips() {
+    const order = PARTIES.map((p, i) => i).sort((a, b) => PARTIES[a].name.localeCompare(PARTIES[b].name, 'he'));
+    $('slips').innerHTML = order.map(i => `<button class="slip" type="button" data-vote="${i}" style="border-top-color:${PARTIES[i].color}">${PARTIES[i].name}</button>`).join('')
+      + '<button class="slip blank" type="button" data-vote="">פתק לבן</button>';
+    $('slips').addEventListener('click', e => {
+      const b = e.target.closest('.slip'); if (!b) return;
+      start(b.dataset.vote === '' ? null : +b.dataset.vote);
+    });
+  }
+
+  function start(vote) {
     SFX.init();
-    S = newState(); S.running = true;
-    startWave(0);
+    S = newState(); S.running = true; S.vote = vote;
+    enterStage(0);
     SFX.play('flush', { vol: .6 });
     $('startScreen').hidden = true; $('endScreen').hidden = true;
-    cvs.focus?.();
   }
 
   const VERDICTS = [
@@ -952,22 +1350,26 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
 
   function endGame() {
     S.running = false; S.over = true;
-    const acc = S.drops ? S.hits / S.drops : 0;
+    const shots = S.drops + S.spits, acc = shots ? S.hits / shots : 0;
     let v = VERDICTS[0][1]; for (const [th, txt] of VERDICTS) if (acc >= th) v = txt;
     $('verdict').textContent = v;
     $('bigCount').innerHTML = `${clock(S.t)}<span> דקות לכל 120</span>`;
-    const parts = [`${S.score} נקודות`, `${S.drops} מעטפות, ${Math.round(acc * 100)}% פגיעה`, `${S.heads} בול בראש`, `רצף שיא ${S.best}`];
+    const parts = [`${S.score} נקודות`, `${S.spits} יריקות ו־${S.drops} מעטפות, ${Math.round(acc * 100)}% פגיעה`, `${S.heads} בול בראש`, `רצף שיא ${S.best}`];
     if (S.citizens) parts.push(`${S.citizens} בוחרים תמימים נפגעו`);
     $('endLede').textContent = parts.join(' · ');
+    $('voteLine').textContent = S.vote == null
+      ? 'שלשלת פתק לבן. גם זה לא עזר להם.'
+      : `הצבעת ${PARTIES[S.vote].name}, ושלשלת על כל ${PARTIES[S.vote].seats} חברי הכנסת שלה בכל זאת.`;
     drawHemicycle();
-    $('partyList').innerHTML = PARTIES.map((p, i) => {
-      const h = S.members.filter(m => m.party === i && m.hit).length;
-      return `<div class="party"><i style="background:${p.color}"></i><span>${p.name}</span><b>${h}/${p.seats}</b></div>`;
+    $('blocList').innerHTML = BLOCS.map((name, bi) => {
+      const ms = S.members.filter(m => PARTIES[m.party].bloc === bi);
+      return `<div class="bloc"><span>${name}</span><b>${ms.length}</b><span>${ms.filter(m => m.hit === 'head').length} בול בראש</span></div>`;
     }).join('');
-    const victims = S.members.filter(m => m.hit);
-    $('victims').innerHTML = victims.length
-      ? victims.map(m => `<span class="victim${m.hit === 'head' ? ' head' : ''}" style="border-color:${PARTIES[m.party].color}">ח״כ ${m.name}</span>`).join('')
-      : '<span class="hint">אף אחד. כל הכנסת יצאה נקייה, כמו תמיד.</span>';
+    $('partyList').innerHTML = PARTIES.map((p, i) => {
+      const ms = S.members.filter(m => m.party === i), sp = ms.filter(m => m.hitBy === 'spit').length;
+      return `<div class="party"><i style="background:${p.color}"></i><span>${p.name} · ${p.seats} מנדטים</span><b>💦${sp} · 💩${ms.length - sp}</b></div>`;
+    }).join('');
+    $('victims').innerHTML = S.members.filter(m => m.hit).map(m => `<span class="victim${m.hit === 'head' ? ' head' : ''}" style="border-color:${PARTIES[m.party].color}">ח״כ ${m.name}</span>`).join('');
     $('toast').textContent = '';
     if (S.score > bestScore()) saveBest(S.score);
     $('endScreen').hidden = false;
@@ -978,38 +1380,42 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
   function drawHemicycle() {
     const svg = $('hemi'), cx = 170, cy = 176, rows = 8, r0 = 60, dr = 14;
     const radii = Array.from({ length: rows }, (_, i) => r0 + i * dr), sum = radii.reduce((a, b) => a + b, 0);
-    let counts = radii.map(r => Math.round(TOTAL * r / sum)); counts[rows - 1] += TOTAL - counts.reduce((a, b) => a + b, 0);
+    const counts = radii.map(r => Math.round(TOTAL * r / sum)); counts[rows - 1] += TOTAL - counts.reduce((a, b) => a + b, 0);
     const seats = [];
     radii.forEach((r, i) => { const n = counts[i]; for (let k = 0; k < n; k++) { const a = Math.PI - k * Math.PI / (n - 1); seats.push({ a, x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) }); } });
-    seats.sort((p, q) => q.a - p.a);
-    const ordered = []; PARTIES.forEach((p, i) => S.members.filter(m => m.party === i).forEach(m => ordered.push(m)));
-    // party blocs read right-to-left, matching Hebrew
-    seats.reverse();
+    seats.sort((p, q) => p.a - q.a); // right to left, bloc by bloc
+    const ordered = [];
+    [0, 1, 2].forEach(bi => PARTIES.forEach((p, i) => { if (p.bloc === bi) S.members.filter(m => m.party === i).forEach(m => ordered.push(m)); }));
     svg.innerHTML = seats.map((s, i) => {
-      const m = ordered[i], c = PARTIES[m.party].color;
-      return m.hit
-        ? `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5.4" fill="#7a4a1f" stroke="${c}" stroke-width="2"><title>ח״כ ${m.name}</title></circle>${m.hit === 'head' ? `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="1.8" fill="#f2c230"/>` : ''}`
-        : `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5.4" fill="${c}" opacity=".9"><title>ח״כ ${m.name}</title></circle>`;
+      const m = ordered[i], c = PARTIES[m.party].color, X = s.x.toFixed(1), Y = s.y.toFixed(1);
+      const fill = !m.hit ? c : m.hitBy === 'spit' ? '#b8e3a0' : '#7a4a1f';
+      return `<rect x="${(s.x - 5).toFixed(1)}" y="${(s.y - 5).toFixed(1)}" width="10" height="10" fill="${fill}" stroke="${c}" stroke-width="2"><title>ח״כ ${m.name} · ${PARTIES[m.party].name}</title></rect>`
+        + (m.hit === 'head' ? `<rect x="${(s.x - 1.5).toFixed(1)}" y="${(s.y - 1.5).toFixed(1)}" width="3" height="3" fill="#fcd23c"/>` : '');
     }).join('') + `<text x="170" y="170" text-anchor="middle" fill="#f4ecd8" font-family="Karantina, Assistant, sans-serif" font-size="30" font-weight="700">${clock(S.t)}</text>`;
   }
 
   async function share() {
-    const txt = `שלשלתי על כל 120 חברי הכנסת ב־${clock(S.t)} דקות ב״שלשלת 2026״ 💩 ${S.score} נקודות, ${S.heads} בול בראש. ${$('verdict').textContent}.`;
+    const txt = `שלשלתי על כל 120 חברי הכנסת ב־${clock(S.t)} דקות ב״שלשלת 2026״ 💩💦 ${S.score} נקודות, ${S.heads} בול בראש. ${$('verdict').textContent}.`;
     try { await navigator.clipboard.writeText(txt); $('toast').textContent = 'התוצאה הועתקה. עכשיו להדביק בקבוצת הווטסאפ המשפחתית.'; }
     catch (e) { $('toast').textContent = txt; }
   }
 
   // ---------- input ----------
   const keys = { left: false, right: false };
+  const SPIT_KEYS = ['x', 'X', 'ס', 'z', 'Z', 'ArrowUp'];
   window.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
     else if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
-    else if (e.key === ' ' || e.key === 'ArrowDown') { if (S.running) { e.preventDefault(); if (!e.repeat) drop(); } }
-    else if (e.key === 'Enter' && !S.running) { e.preventDefault(); start(); }
+    else if (e.key === ' ' || e.key === 'ArrowDown') { if (S.running) { e.preventDefault(); if (!e.repeat) press('poop'); } }
+    else if (SPIT_KEYS.includes(e.key)) { if (S.running && !e.repeat) { e.preventDefault(); press('spit'); } }
+    else if (e.key === 'Enter' && !S.running && !$('startScreen').hidden) { e.preventDefault(); start(null); }
+    else if (e.key === 'm' || e.key === 'M') { SFX.setMuted(!SFX.muted); syncMute(); }
   });
   window.addEventListener('keyup', e => {
     if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
     if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+    if (e.key === ' ' || e.key === 'ArrowDown') release('poop');
+    if (SPIT_KEYS.includes(e.key)) release('spit');
   });
   function hold(btn, k) {
     const on = e => { e.preventDefault(); keys[k] = true; btn.classList.add('held'); S.target = null; };
@@ -1017,38 +1423,54 @@ canvas#game { display: block; touch-action: none; border-radius: 6px; }
     btn.addEventListener('pointerdown', on); ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, off));
   }
   hold($('leftBtn'), 'left'); hold($('rightBtn'), 'right');
-  $('dropBtn').addEventListener('pointerdown', e => { e.preventDefault(); drop(); });
-  $('dropBtn').addEventListener('click', e => { if (e.detail === 0) drop(); });
+  function weaponBtn(btn, w) {
+    btn.addEventListener('pointerdown', e => { e.preventDefault(); btn.classList.add('held'); press(w); });
+    const up = () => { if (!btn.classList.contains('held')) return; btn.classList.remove('held'); release(w); };
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, up));
+    btn.addEventListener('click', e => { if (e.detail === 0) { press(w); release(w); } });
+  }
+  weaponBtn($('spitBtn'), 'spit'); weaponBtn($('dropBtn'), 'poop');
 
+  // On the canvas: drag to move. On the roof view, press-and-hold charges a poop and release throws it;
+  // on the side views a tap drops one.
   let drag = null;
   const toGame = e => { const r = cvs.getBoundingClientRect(); return (e.clientX - r.left) / r.width * W; };
-  cvs.addEventListener('pointerdown', e => { drag = { x0: e.clientX, moved: false }; cvs.setPointerCapture(e.pointerId); });
+  cvs.addEventListener('pointerdown', e => {
+    drag = { x0: e.clientX, moved: false }; cvs.setPointerCapture(e.pointerId);
+    if (view() === 'top') press('poop');
+  });
   cvs.addEventListener('pointermove', e => {
     if (!drag) return;
     if (Math.abs(e.clientX - drag.x0) > 8) drag.moved = true;
     if (drag.moved) S.target = toGame(e);
   });
-  cvs.addEventListener('pointerup', () => { if (drag && !drag.moved) drop(); drag = null; });
-  cvs.addEventListener('pointercancel', () => { drag = null; });
+  cvs.addEventListener('pointerup', () => {
+    if (drag) { if (view() === 'top') release('poop'); else if (!drag.moved) press('poop'); }
+    drag = null;
+  });
+  cvs.addEventListener('pointercancel', () => { drag = null; if (view() === 'top') release('poop'); });
 
   const syncMute = () => { $('muteBtn').textContent = SFX.muted ? '🔇' : '🔊'; $('muteBtn').setAttribute('aria-pressed', SFX.muted); };
   $('muteBtn').addEventListener('click', () => { SFX.init(); SFX.setMuted(!SFX.muted); syncMute(); });
-  window.addEventListener('keydown', e => { if (e.key === 'm' || e.key === 'M') { SFX.setMuted(!SFX.muted); syncMute(); } });
   syncMute();
-  $('startBtn').addEventListener('click', start);
-  $('againBtn').addEventListener('click', start);
+  $('againBtn').addEventListener('click', () => { $('endScreen').hidden = true; $('startScreen').hidden = false; S = newState(); idleCrowd(); });
   $('shareBtn').addEventListener('click', share);
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
   window.addEventListener('resize', resize);
 
-  if (location.hash === '#debug') window.__shil = () => S; // playtest hook
+  // idle crowd on the roof view behind the start screen
+  function idleCrowd() {
+    S.waveQueue = S.members.filter(m => m.party === WAVES[0]).slice(0, 5);
+    for (let i = 0; i < 5; i++) { const p = spawnOne('mk'); p.x = 50 + i * 80; p.umbrella = false; }
+  }
+
+  if (location.hash === '#debug') { window.__shil = () => S; window.__fire = (w, c) => { if (S[METER[w]] >= COST[w]) fire(w, c); }; } // playtest hooks
+  buildSlips();
   showBest();
   resize();
-  // idle demo crowd behind the start screen
-  S.waveQueue = S.members.slice(0, 4);
-  for (let i = 0; i < 4; i++) { spawnOne('mk'); S.people[i].x = 60 + i * 95; }
+  idleCrowd();
   requestAnimationFrame(frame);
-  if (document.fonts) document.fonts.ready.then(resize);
+  if (document.fonts) document.fonts.ready.then(() => { for (const k in BG) delete BG[k]; resize(); });
 })();
 </script>
 
